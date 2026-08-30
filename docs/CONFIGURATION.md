@@ -35,6 +35,8 @@ Volume wie das Audit-Log. Treiber lesen bei jedem Zugriff frisch — eine
 | `ENTRA_IT_USERS` | leer | UPNs mit Rolle `it`, kommagetrennt — Notnagel ohne App-Rollen |
 | `ENTRA_ADMIN_USERS` | leer | dito für `admin` |
 | `DEV_ROLE` | `admin` | Rolle des Entwicklungs-Benutzers, wenn Entra aus ist |
+| `DEV_USER_ID` | `dev@bfs.local` | Kennung des Entwicklungs-Benutzers. Zum Durchspielen des Vier-Augen-Prinzips ohne Entra: zwei Instanzen mit verschiedenen Kennungen starten |
+| `DEV_USER_NAME` | `Entwicklungs-Benutzer` | Anzeigename des Entwicklungs-Benutzers |
 
 Rollen in der Reihenfolge ihrer Rechte: `user` → `it` → `admin`.
 Bevorzugte Quelle sind die Entra-App-Rollen `portal.it` und `portal.admin`.

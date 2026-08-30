@@ -26,10 +26,17 @@ const { ROLES, rank } = require('./roles');
 // durchspielen kann, ohne einen Mandanten zu haben.
 const DEV_ROLE = ROLES.includes(process.env.DEV_ROLE) ? process.env.DEV_ROLE : 'admin';
 
+// Kennung und Name sind ebenfalls einstellbar. Ohne das laesst sich das
+// Vier-Augen-Prinzip ohne Entra gar nicht durchspielen: die Pruefung vergleicht
+// `job.requestedBy` mit `user.id`, und bei einer festen Kennung ist der
+// Freigebende immer dieselbe Person wie der Anfragende.
+const DEV_USER_ID = process.env.DEV_USER_ID || 'dev@bfs.local';
+const DEV_USER_NAME = process.env.DEV_USER_NAME || 'Entwicklungs-Benutzer';
+
 const DEV_USER = {
-  id: 'dev@bfs.local',
-  displayName: 'Entwicklungs-Benutzer',
-  email: 'dev@bfs.local',
+  id: DEV_USER_ID,
+  displayName: DEV_USER_NAME,
+  email: DEV_USER_ID,
   department: 'IT',
   role: DEV_ROLE,
   authenticated: false
