@@ -1,0 +1,23 @@
+[Unit]
+Description=BFS Support Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Läuft als root — das Gegenstück zu LocalSystem unter Windows.
+User=root
+EnvironmentFile=/etc/bfs-agent.env
+ExecStart=/usr/bin/python3 /opt/bfs-agent/bfs-agent.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Der Agent braucht keinen Schreibzugriff auf das System ausser dem,
+# was die freigegebenen Befehle selbst tun.
+NoNewPrivileges=false
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

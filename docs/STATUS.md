@@ -1,0 +1,74 @@
+# Stand
+
+Letzte Aktualisierung: 2026-08-30.
+
+Prototyp und Entwicklungsumgebung, nichts Produktives. Hochverfügbarkeit,
+Alarmierung und Backups sind bewusst kein Ziel. Fernziel ist ein
+KI-gestützter 1st-Level-Support: Chat, Diagnose und Eingriffe im
+Administratorkontext auf dem Client, jeweils mit Freigabe und Audit-Log.
+
+Betrieben wird das Ganze auf einem Raspberry Pi 5, weil kein Windows-Rechner
+zum Testen zur Verfügung steht. Das prägt einiges: die Linux-Varianten der
+Aktionen sind erprobt, die PowerShell-Varianten sind es nicht.
+
+## Fertig und verifiziert
+
+**Chat.** Echter Claude-Chat über SSE, Verlauf über 20 Züge, rund 0,9 ct pro
+Gespräch.
+
+**Werkzeuge.** Tool Use gegen die feste Aktionsliste. Lesende Aktionen laufen
+sofort mit echten Gerätedaten.
+
+**Freigaben.** Schreibende Aktionen halten bei `awaiting_approval` an.
+Ende zu Ende geprüft: Klick im UI → Exit 0 → das Journal auf dem Zielgerät
+schrumpfte von 9,4 MB auf 8,0 MB.
+
+**Absicherung.** Zwei unabhängige Ebenen, im Test abgewiesen wurden `bash -c`,
+`curl`, `systemctl mask` und ein Argument mit `;`. Details in
+[`SECURITY.md`](SECURITY.md).
+
+**Rollen und Bereiche.** `user` → `it` → `admin`, getrennte Bereiche `/`,
+`/it`, `/admin`. Geprüft: als `user` liefern `/api/devices`, `/api/jobs` und
+`/api/audit` 403, als `it`/`admin` 200.
+
+**Entra-Anmeldung.** Code fertig. Geprüft in allen drei Zuständen: aus,
+an ohne IDs (500 wie beabsichtigt), an mit IDs (401 ohne und bei ungültigem
+Token). Fehlen nur die beiden IDs eines echten Mandanten.
+
+**Atlassian.** Confluence-Suche und Jira-Ticket, 13 Prüfungen gegen die
+Attrappe plus die echten Endpunkte im ausgerollten Container.
+
+**Konten.** Drei AD-Aktionen im Backend, 8 Prüfungen. Entra-Treiber für die
+SSPR-Triage, 7 Prüfungen.
+
+**Einstellungen über die Oberfläche.** 11 Prüfungen. Live gegengeprüft, dass
+ein Token in keiner Antwort und in keinem Audit-Eintrag auftaucht.
+
+**Eskalation durch das Modell.** Am echten Modell durchgespielt, nicht nur im
+Codepfad: „Display gesprungen" → Wissenssuche → `create_ticket` → Ticket
+angelegt, Nummer in der Antwort genannt, Audit-Eintrag mit `viaChat: true`.
+
+Dabei fiel auf, dass die Confluence-Suche nur Titel, Auszug und Link liefert —
+nicht den Seiteninhalt. Das Modell konnte auf die richtige Seite zeigen, aber
+nicht daraus antworten. Behoben: für die beiden vordersten Treffer wird der
+Seitenkörper nachgeladen und aus dem XHTML Fließtext gemacht.
+
+## Offen
+
+1. **Zwei Entra-IDs** eines echten Mandanten — dann ist die Anmeldung scharf.
+2. **Passwort/Konten: die IT-Ansicht fehlt.** Backend steht (Kontostatus,
+   Entsperren, Zurücksetzen), die Oberfläche dazu noch nicht.
+3. **bConnect am echten Server prüfen.** Verifiziert ist nur gegen die
+   Attrappe. Offen sind die Feldnamen der JobInstance-Zustände
+   (`interpretState()`) und ob ein bMS-Job Rohausgabe liefert oder nur Status.
+4. **Software-Tab ist eine Attrappe.**
+5. **Freigabe eines fremden Auftrags als `user`** ist ungeprüft — dafür
+   braucht es zwei echte Identitäten.
+6. **Aufträge und Geräte liegen im RAM** und sind nach einem Backend-Neustart
+   weg. Das Audit-Log überlebt.
+7. **Die Windows-Varianten der Aktionen sind nie auf Windows gelaufen.**
+
+## Bekannte Einschränkungen der Umgebung
+
+Das System liegt auf einer SD-Karte, nicht auf einer SSD. Für einen Prototyp
+in Ordnung, für Dauerbetrieb mit Schreiblast nicht.

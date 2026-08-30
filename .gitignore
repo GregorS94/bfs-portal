@@ -1,0 +1,18 @@
+# Zugangsdaten — gehören nie ins Repo
+.env
+.env.*
+!.env.example
+
+# Laufzeitdaten: Audit-Log und über die Oberfläche gesetzte Einstellungen
+data/
+*.jsonl
+settings.json
+
+node_modules/
+dist/
+build/
+
+*.bak
+*.log
+.DS_Store
+._*

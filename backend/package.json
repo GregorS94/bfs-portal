@@ -1,0 +1,14 @@
+{
+  "name": "bfs-portal-backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "@anthropic-ai/sdk": "^0.71.0",
+    "jose": "^5.9.6"
+  }
+}
