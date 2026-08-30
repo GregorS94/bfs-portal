@@ -39,6 +39,13 @@ services:
       DATA_DIR: /data
       # In der Testumgebung darf das Log kurzlebig sein.
       AUDIT_RETENTION_DAYS: 7
+      # Wer hier angemeldet ist, laesst sich beim Start umstellen. Damit kann
+      # man das Vier-Augen-Prinzip durchspielen, ohne einen Entra-Mandanten zu
+      # haben: einmal als anfragende Person, einmal als IT-Support.
+      #   DEV_ROLE=it DEV_USER_ID=t.schmidt@bfs.local docker compose -f docker-compose.staging.yml up -d backend
+      DEV_ROLE: ${DEV_ROLE:-user}
+      DEV_USER_ID: ${DEV_USER_ID:-a.muster@bfs.local}
+      DEV_USER_NAME: ${DEV_USER_NAME:-Anna Muster}
     volumes:
       - staging_audit:/data
     ports:
