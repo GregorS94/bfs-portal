@@ -11,6 +11,9 @@ const UNIT_PATH = /^[A-Za-z0-9._@/-]{1,128}$/;
 // damit kann kein DN und kein LDAP-Filter durchrutschen.
 const AD_IDENTITY = /^[A-Za-z0-9._-]{1,64}(@[A-Za-z0-9.-]{1,192})?$/;
 
+// `fourEyes: true` heisst: der Auftraggeber darf den eigenen Auftrag nicht
+// freigeben. Fuer Aktionen, die fremde Konten betreffen, ist die Zustimmung
+// des Anfragenden keine Kontrolle, sondern nur ein zweiter Klick.
 const ACTIONS = {
   get_disk_space: {
     risk: 'read',
@@ -159,6 +162,7 @@ const ACTIONS = {
   unlock_ad_account: {
     risk: 'write',
     chat: false,
+    fourEyes: true,
     description:
       'Hebt die Sperre eines AD-Kontos auf. Das Passwort bleibt unverändert.',
     input_schema: {
@@ -186,6 +190,7 @@ const ACTIONS = {
   reset_ad_password: {
     risk: 'write',
     chat: false,
+    fourEyes: true,
     description:
       'Setzt ein neues Einmal-Passwort für ein AD-Konto und erzwingt die Änderung ' +
       'bei der nächsten Anmeldung.',

@@ -71,9 +71,21 @@ sudo systemctl enable --now bfs-agent
 journalctl -u bfs-agent -f
 ```
 
-`DEVICE_ID` ist optional; ohne Angabe nimmt der Agent den Hostnamen. Er meldet
-sich zyklisch neu an — nach einem Backend-Neustart taucht er von selbst wieder
-auf, das kann bis zu einem Poll-Zyklus (40 s) dauern.
+`DEVICE_ID` ist optional; ohne Angabe nimmt der Agent den Hostnamen.
+
+Beim ersten Start meldet er sich mit `AGENT_TOKEN` an und bekommt ein eigenes
+Geräte-Token, das er unter `/etc/bfs-agent.token` (0600) ablegt. Danach
+arbeitet er nur noch damit; `AGENT_TOKEN` wird erst wieder gebraucht, wenn das
+Gerät neu angemeldet werden soll.
+
+Anschließend sendet er alle 40 Sekunden ein Lebenszeichen — nach einem
+Backend-Neustart taucht er von selbst wieder auf.
+
+**Token rotieren:** `/etc/bfs-agent.token` löschen und den Dienst neu starten.
+Das alte Token verfällt dabei.
+
+**Gerät sperren:** als `admin` über `POST /api/admin/agents/<deviceId>/revoke`.
+Wirkt sofort; das Gerät kann sich auch nicht neu anmelden.
 
 Der Agent läuft als root. Das ist beabsichtigt und der Grund, warum die
 Absicherung in der Freigabeliste liegt: siehe [`SECURITY.md`](SECURITY.md).
@@ -99,3 +111,12 @@ Zugriff frisch, ein Neustart ist nicht nötig.
 
 Für bConnect ist `BCONNECT_ALLOWED_JOBS` Pflicht — ohne diese Liste ist kein
 einziger Job ausführbar.
+
+## Vor dem Produktivbetrieb
+
+`AUDIT_RETENTION_DAYS` setzen — ohne Frist wächst das Audit-Log unbegrenzt und
+enthält dabei Personenbezug. Welche Frist angemessen ist, gehört mit
+Datenschutz und Betriebsrat geklärt; siehe [`PROZESSE.md`](PROZESSE.md).
+
+Ausserdem: `AGENT_TOKEN` nach dem Ausrollen der Agenten rotieren. Es wird nur
+zum Anmelden gebraucht, ist danach aber weiterhin gültig.

@@ -62,19 +62,40 @@ siehe [`SECURITY.md`](SECURITY.md).
 | GET | `/api/admin/settings` | admin | alle Gruppen, Geheimnisse nur als `set: true/false` |
 | PUT | `/api/admin/settings/:group` | admin | Gruppe speichern |
 | POST | `/api/admin/settings/:group/test` | admin | Probelauf gegen das echte System |
+| GET | `/api/admin/agents` | admin | Geräte-Token: Übersicht, ohne Token und Hashes |
+| POST | `/api/admin/agents/:deviceId/revoke` | admin | Gerät sperren, wirkt sofort |
+| POST | `/api/admin/agents/:deviceId/unrevoke` | admin | Sperre aufheben; das Gerät muss sich neu anmelden |
 
 Ein leer gelassenes Geheimnisfeld bedeutet „nicht anfassen". Zum Entfernen
 `null` senden.
 
 ## Agent
 
-Eigener Token im `Authorization: Bearer`-Kopf, nicht Entra.
+Eigene Token im `Authorization: Bearer`-Kopf, nicht Entra. Es gibt zwei:
 
-| Methode | Pfad | Zweck |
-|---------|------|-------|
-| POST | `/api/agent/register` | Gerät anmelden, zyklisch wiederholt |
-| GET | `/api/agent/jobs?deviceId=` | Long-Poll auf freigegebene Aufträge |
-| POST | `/api/agent/jobs/:id/result` | Ergebnis zurückmelden |
+- Das **Anmelde-Token** (`AGENT_TOKEN` aus der `.env`) gilt nur für
+  `/api/agent/register`.
+- Das **Geräte-Token** wird bei der Anmeldung vergeben und gilt für alles
+  Weitere — geprüft gegen genau die Gerätekennung aus der Anfrage. Ein Agent
+  kann damit nur seine eigenen Aufträge abholen.
+
+Die Gerätekennung kommt aus `?deviceId=`, dem Feld `deviceId` im Body oder dem
+Kopf `X-Device-Id`.
+
+| Methode | Pfad | Token | Zweck |
+|---------|------|-------|-------|
+| POST | `/api/agent/register` | Anmelde-Token | Gerät anmelden, liefert `agentToken` |
+| POST | `/api/agent/heartbeat` | Geräte-Token | Lebenszeichen, ohne neues Token |
+| GET | `/api/agent/jobs?deviceId=` | Geräte-Token | Long-Poll auf freigegebene Aufträge |
+| POST | `/api/agent/jobs/:id/result` | Geräte-Token | Ergebnis zurückmelden |
+
+Ein erneutes `register` vergibt ein neues Token und entwertet das alte — so
+lässt sich rotieren. Ein gesperrtes Gerät bekommt `403`; sonst wäre die Sperre
+wirkungslos, weil jeder mit dem Anmelde-Token neu anfangen könnte.
+
+Für den laufenden Betrieb ist `heartbeat` der richtige Weg: Es hält „zuletzt
+gesehen" aktuell, ohne bei jedem Durchlauf ein Token zu vergeben und einen
+Audit-Eintrag zu erzeugen.
 
 ## `GET /api/health/services`
 

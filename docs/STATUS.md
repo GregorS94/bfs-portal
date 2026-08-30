@@ -44,6 +44,19 @@ SSPR-Triage, 7 Prüfungen.
 **Einstellungen über die Oberfläche.** 11 Prüfungen. Live gegengeprüft, dass
 ein Token in keiner Antwort und in keinem Audit-Eintrag auftaucht.
 
+**Vier-Augen bei Kontoaktionen.** `reset_ad_password` und `unlock_ad_account`
+können nicht von der anfragenden Person freigegeben werden. 20 Prüfungen.
+
+**Audit-Log verkettet.** Jeder Eintrag trägt den Hash seines Vorgängers;
+Änderungen und Löschungen werden sichtbar. Aufbewahrungsfrist über
+`AUDIT_RETENTION_DAYS`, die Bereinigung protokolliert sich selbst. 18 Prüfungen,
+dazu die Prüfung beim Start am laufenden System.
+
+**Geräte-Token statt gemeinsamem Geheimnis.** Jedes Gerät hat ein eigenes,
+gegen seine Kennung geprüftes Token; Sperren wirkt sofort und verhindert eine
+erneute Anmeldung. 22 Prüfungen, dazu live auf dem Pi durchgespielt: Anmeldung,
+Abweisung eines fremden Tokens, Sperren, Entsperren.
+
 **Eskalation durch das Modell.** Am echten Modell durchgespielt, nicht nur im
 Codepfad: „Display gesprungen" → Wissenssuche → `create_ticket` → Ticket
 angelegt, Nummer in der Antwort genannt, Audit-Eintrag mit `viaChat: true`.
@@ -62,8 +75,9 @@ Seitenkörper nachgeladen und aus dem XHTML Fließtext gemacht.
    Attrappe. Offen sind die Feldnamen der JobInstance-Zustände
    (`interpretState()`) und ob ein bMS-Job Rohausgabe liefert oder nur Status.
 4. **Software-Tab ist eine Attrappe.**
-5. **Freigabe eines fremden Auftrags als `user`** ist ungeprüft — dafür
-   braucht es zwei echte Identitäten.
+5. **Freigabe eines fremden Auftrags als `user`** ist am laufenden System
+   ungeprüft — dafür braucht es zwei echte Identitäten. Die Regel selbst ist
+   in `tools/approval-test.js` abgedeckt.
 6. **Aufträge und Geräte liegen im RAM** und sind nach einem Backend-Neustart
    weg. Das Audit-Log überlebt.
 7. **Die Windows-Varianten der Aktionen sind nie auf Windows gelaufen.**

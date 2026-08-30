@@ -1,0 +1,66 @@
+# Testumgebung neben der Produktivumgebung.
+#
+# Eigener Projektname, eigene Ports, eigenes Volume — damit ein Versuch hier
+# weder die laufende Instanz noch deren Audit-Log berührt. MaRisk und DORA
+# verlangen diese Trennung; sie ist aber auch ohne Aufsicht die einzige Art,
+# eine Änderung zu prüfen, ohne den Betrieb zu riskieren.
+#
+#   docker compose -f docker-compose.staging.yml up -d --build
+#
+# Die .env wird geteilt. Für abweichende Zugangsdaten stattdessen eine
+# .env.staging anlegen und `env_file` unten umhängen.
+
+name: bfs-portal-staging
+
+services:
+  frontend:
+    build: ./frontend
+    image: bfs-portal-frontend:staging
+    container_name: bfs-portal-staging-frontend
+    restart: unless-stopped
+    ports:
+      - "9010:80"
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  backend:
+    build: ./backend
+    image: bfs-portal-backend:staging
+    container_name: bfs-portal-staging-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATA_DIR: /data
+      # In der Testumgebung darf das Log kurzlebig sein.
+      AUDIT_RETENTION_DAYS: 7
+    volumes:
+      - staging_audit:/data
+    ports:
+      - "9011:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  mock-api:
+    build: ./mock-apis
+    image: bfs-portal-mock-api:staging
+    container_name: bfs-portal-staging-mock-api
+    restart: unless-stopped
+    ports:
+      - "9012:3002"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3002/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  staging_audit:

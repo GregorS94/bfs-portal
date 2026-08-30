@@ -18,6 +18,13 @@ je Teil eines Befehlstextes werden.
 **Eine neue Aktion braucht einen Eintrag in der Freigabeliste des Agenten.**
 Sonst führt der Agent sie zu Recht nicht aus.
 
+**Aktionen, die fremde Konten betreffen, bekommen `fourEyes: true`.** Dann darf
+die anfragende Person den eigenen Auftrag nicht freigeben.
+
+**Das Audit-Log ist verkettet.** Einträge nachträglich zu ändern bricht die
+Kette sichtbar — was der Sinn der Sache ist. Wer Einträge programmatisch
+entfernt, nutzt `pruneAudit()`, nicht die Datei direkt.
+
 **Neue Backend-Dateien in `backend/Dockerfile` eintragen.** Dort steht eine
 Liste einzelner `COPY`-Anweisungen. Wer das vergisst, bekommt
 `MODULE_NOT_FOUND` beim Start des Containers.
@@ -44,8 +51,9 @@ git add -A && git commit && git push
 ```
 
 ```bash
-node tools/actions-test.js && node tools/atlassian-test.js \
-  && node tools/entra-test.js && node tools/settings-test.js
+for t in actions atlassian entra settings approval audit agents; do
+  node tools/$t-test.js || break
+done
 ```
 
 Bei Änderungen an der Oberfläche zusätzlich einen Screenshot ziehen — im

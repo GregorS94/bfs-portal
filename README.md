@@ -95,11 +95,13 @@ Nachbau der Request-Formen genügt, um Filterlogik und Injektionsabwehr zu
 prüfen.
 
 ```bash
-node tools/actions-test.js      # 8 Prüfungen: AD-Aktionen, Eingabevalidierung
-node tools/atlassian-test.js    # 13 Prüfungen: CQL, ADF, Ticket-Wiederverwendung
-node tools/entra-test.js        # 7 Prüfungen: SSPR-Triage, OData-Injektion
-node tools/settings-test.js     # 11 Prüfungen: Geheimnisse, Vorrang, Rollen
+for t in actions atlassian entra settings approval audit agents; do
+  node tools/$t-test.js || break
+done
 ```
+
+102 Prüfungen, ohne Server und ohne installierte Abhängigkeiten. Was sie im
+Einzelnen abdecken, steht in [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
 
 ## Lizenz
 

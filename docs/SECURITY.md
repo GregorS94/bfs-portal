@@ -21,6 +21,56 @@ die Metazeichen interpretieren könnte.
 
 Im Test abgewiesen: `bash -c`, `curl`, `systemctl mask`, ein Argument mit `;`.
 
+## Vier-Augen bei Kontoaktionen
+
+`reset_ad_password` und `unlock_ad_account` tragen `fourEyes: true`. Für sie
+gilt: Die anfragende Person darf den eigenen Auftrag **nicht** freigeben, und
+es braucht mindestens die Rolle `it`.
+
+Der Grund ist einfach: Diese Aktionen betreffen ein fremdes Konto. Die
+Zustimmung des Anfragenden ist dort keine Kontrolle, sondern nur ein zweiter
+Klick derselben Person.
+
+Die Logik liegt in `backend/approval.js` — bewusst als eigenes Modul, damit sie
+ohne laufenden Server prüfbar ist (`tools/approval-test.js`).
+
+## Geräte-Token
+
+Jedes Gerät hat ein eigenes Token, das bei der Anmeldung vergeben und **gegen
+genau seine Gerätekennung** geprüft wird. Ein von einem Rechner abgegriffenes
+Token taugt damit nicht, um die Aufträge eines anderen abzuholen — das war mit
+dem früheren gemeinsamen Geheimnis möglich.
+
+- Gespeichert wird nur der SHA-256-Hash (`/data/agents.json`, 0600). Wer die
+  Datei liest, kann sich nicht ausgeben.
+- Der Vergleich läuft laufzeitkonstant, sonst verriete die Dauer, wie viele
+  Zeichen stimmen.
+- Sperren wirkt sofort und verhindert auch eine erneute Anmeldung. Ohne diese
+  zweite Regel wäre die Sperre wertlos.
+- Das gemeinsame Geheimnis aus der `.env` bleibt, aber nur noch für den einen
+  Anmeldeschritt. Es gehört nach dem Ausrollen rotiert.
+
+## Audit-Log: Manipulation wird sichtbar
+
+Jeder Eintrag trägt den Hash seines Vorgängers. Wer eine Zeile nachträglich
+ändert oder entfernt, bricht die Kette an dieser Stelle. Das verhindert keine
+Manipulation — wer Zugriff auf den Host hat, kann die Datei ändern — aber es
+macht sie nachweisbar, und genau das ist der Zweck eines Audit-Logs.
+
+- `tools/audit-verify.js` prüft die Kette, Exit 1 bei Bruch.
+- Das Backend prüft beim Start und meldet Befunde in der Konsole. Ein
+  gebrochenes Log ist kein Grund, den Support stillzulegen.
+- Wer einen Eintrag ändert *und* seinen Hash neu berechnet, wird beim
+  Nachfolger auffällig — dessen `prev` zeigt noch auf den alten Wert.
+- `AUDIT_RETENTION_DAYS` löscht alte Einträge. Der Vorgang wird im Log selbst
+  vermerkt (`audit.pruned`, mit Anzahl und dem Hash des letzten gelöschten
+  Eintrags), damit eine reguläre Aufbewahrungsfrist nicht wie Manipulation
+  aussieht.
+
+Was das **nicht** leistet: Wer die gesamte Datei neu schreibt und dabei alle
+Hashes konsistent nachrechnet, bleibt unentdeckt. Dagegen hilft nur, das Log
+auf ein System auszuleiten, auf dem der Portal-Host keine Schreibrechte hat.
+
 ## Eingabevalidierung an den Rändern
 
 | Stelle | Risiko | Abwehr |
@@ -71,7 +121,8 @@ keine interaktive Anmeldung.
   sind. Im abgeschlossenen Netz vertretbar; für einen Produktivbetrieb
   gehörte ein eigenes Monitoring-Token davor.
 - **Aufträge und Geräte liegen im RAM.** Nach einem Backend-Neustart sind sie
-  weg. Das Audit-Log überlebt, weil es auf Platte geschrieben wird.
+  weg. Das Audit-Log überlebt, weil es auf Platte geschrieben wird. Die
+  Geräte-Token ebenfalls — sie liegen in `/data/agents.json`.
 - **Ein Ticket pro Gespräch** wird im RAM verfolgt. Nach einem Neustart kann
   dasselbe Gespräch ein zweites Ticket erzeugen.
 - **Der Agent läuft als root** (Äquivalent zu LocalSystem). Das ist der Sinn

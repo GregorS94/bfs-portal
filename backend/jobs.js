@@ -14,10 +14,142 @@ const jobs = new Map();
 const devices = new Map();
 const waiters = new Map(); // deviceId -> [resolve, ...] für das Long-Polling
 
+// --- Audit-Log ---------------------------------------------------------------
+//
+// Jeder Eintrag traegt den Hash seines Vorgaengers. Wer eine Zeile nachtraeglich
+// aendert oder herausloescht, bricht die Kette ab dieser Stelle — das faellt bei
+// `verifyAudit()` auf. Das verhindert keine Manipulation, aber es macht sie
+// nachweisbar, und genau das ist der Zweck eines Audit-Logs.
+//
+// Der Hash deckt den Eintrag ohne sein eigenes `hash`-Feld ab, sonst waere er
+// von sich selbst abhaengig.
+
+const GENESIS = '0'.repeat(64);
+const RETENTION_DAYS = Number(process.env.AUDIT_RETENTION_DAYS || 0);
+
+function hashEntry(entry) {
+  const { hash, ...rest } = entry;
+  return crypto.createHash('sha256').update(JSON.stringify(rest)).digest('hex');
+}
+
+/** Hash und laufende Nummer des letzten Eintrags — die Basis fuer den naechsten. */
+function auditTail() {
+  if (!fs.existsSync(AUDIT_FILE)) return { prev: GENESIS, seq: 0 };
+  const lines = fs.readFileSync(AUDIT_FILE, 'utf8').split('\n').filter(Boolean);
+  if (!lines.length) return { prev: GENESIS, seq: 0 };
+  try {
+    const last = JSON.parse(lines[lines.length - 1]);
+    return { prev: last.hash || GENESIS, seq: last.seq || lines.length };
+  } catch {
+    // Eine unlesbare letzte Zeile ist selbst schon ein Befund. Weiterschreiben
+    // mit Genesis waere still; stattdessen bleibt der Bruch in der Kette sichtbar.
+    return { prev: GENESIS, seq: lines.length };
+  }
+}
+
 function audit(event, detail) {
-  const line = JSON.stringify({ ts: new Date().toISOString(), event, ...detail });
+  const { prev, seq } = auditTail();
+  const entry = { ts: new Date().toISOString(), seq: seq + 1, event, ...detail, prev };
+  entry.hash = hashEntry(entry);
   // Synchron und append-only: das Log wird vom Backend geschrieben, nie vom Modell.
-  fs.appendFileSync(AUDIT_FILE, line + '\n');
+  fs.appendFileSync(AUDIT_FILE, JSON.stringify(entry) + '\n');
+}
+
+/**
+ * Prueft die Kette von vorne bis hinten.
+ * Liefert { ok, entries, problems: [{ line, reason }] }.
+ */
+function verifyAudit() {
+  if (!fs.existsSync(AUDIT_FILE)) return { ok: true, entries: 0, problems: [] };
+  const lines = fs.readFileSync(AUDIT_FILE, 'utf8').split('\n').filter(Boolean);
+  const problems = [];
+  let prev = GENESIS;
+
+  lines.forEach((raw, i) => {
+    const line = i + 1;
+    let entry;
+    try {
+      entry = JSON.parse(raw);
+    } catch {
+      problems.push({ line, reason: 'Zeile ist kein gültiges JSON.' });
+      return;
+    }
+    // Eintraege von vor der Umstellung haben keine Kette. Sie zu bemaengeln
+    // waere Rauschen — ab hier faengt die Kette an.
+    if (!entry.hash) {
+      prev = GENESIS;
+      return;
+    }
+    if (entry.prev !== prev) {
+      problems.push({ line, reason: `Vorgänger-Hash passt nicht (${entry.event}).` });
+    }
+    if (hashEntry(entry) !== entry.hash) {
+      problems.push({ line, reason: `Eintrag wurde nachträglich verändert (${entry.event}).` });
+    }
+
+    // Ein Bereinigungs-Marker bezeugt die Luecke, die er selbst gerissen hat:
+    // die Kette laeuft beim Hash des letzten geloeschten Eintrags weiter, damit
+    // der erste behaltene Eintrag wieder passt. Ohne diesen Sprung saehe jede
+    // regulaere Aufbewahrungsfrist wie Manipulation aus.
+    prev = entry.event === 'audit.pruned' && entry.lastRemovedHash
+      ? entry.lastRemovedHash
+      : entry.hash;
+  });
+
+  return { ok: problems.length === 0, entries: lines.length, problems };
+}
+
+/**
+ * Entfernt Eintraege, die aelter als die Aufbewahrungsfrist sind.
+ *
+ * Das bricht die Kette zwangslaeufig. Damit die Luecke nicht wie Manipulation
+ * aussieht, wird der Vorgang selbst als erster Eintrag der neuen Datei
+ * protokolliert — mit Anzahl und dem Hash des letzten geloeschten Eintrags.
+ */
+function pruneAudit(days = RETENTION_DAYS) {
+  if (!days || !fs.existsSync(AUDIT_FILE)) return { removed: 0 };
+
+  const cutoff = Date.now() - days * 86_400_000;
+  const lines = fs.readFileSync(AUDIT_FILE, 'utf8').split('\n').filter(Boolean);
+  const keep = [];
+  let lastRemoved = null;
+
+  for (const raw of lines) {
+    let entry;
+    try {
+      entry = JSON.parse(raw);
+    } catch {
+      keep.push(raw);
+      continue;
+    }
+    if (!keep.length && new Date(entry.ts).getTime() < cutoff) {
+      lastRemoved = entry;
+    } else {
+      keep.push(raw);
+    }
+  }
+
+  if (!lastRemoved) return { removed: 0 };
+
+  const removed = lines.length - keep.length;
+  const marker = {
+    ts: new Date().toISOString(),
+    seq: 1,
+    event: 'audit.pruned',
+    removed,
+    retentionDays: days,
+    lastRemovedHash: lastRemoved.hash || null,
+    lastRemovedTs: lastRemoved.ts,
+    prev: GENESIS
+  };
+  marker.hash = hashEntry(marker);
+
+  // Die verbleibenden Eintraege behalten ihre alten Hashes — sie neu zu
+  // verketten hiesse, sie neu zu signieren, und der Schutz waere dahin.
+  // `verifyAudit()` springt am Marker auf `lastRemovedHash` und liest die
+  // Kette dort weiter.
+  fs.writeFileSync(AUDIT_FILE, [JSON.stringify(marker), ...keep].join('\n') + '\n');
+  return { removed };
 }
 
 function readAudit(limit = 200) {
@@ -194,7 +326,7 @@ function waitForResult(id, timeoutMs = 30_000) {
 }
 
 module.exports = {
-  audit, readAudit, registerDevice, touchDevice, listDevices,
+  audit, readAudit, verifyAudit, pruneAudit, registerDevice, touchDevice, listDevices,
   createJob, approveJob, denyJob, waitForJob, completeJob,
   getJob, listJobs, waitForResult
 };

@@ -19,8 +19,8 @@ const CONFIG = {
 };
 
 // Rollen, aufsteigend. 'admin' schließt 'it' ein, 'it' schließt 'user' ein.
-const ROLES = ['user', 'it', 'admin'];
-const rank = (role) => Math.max(0, ROLES.indexOf(role));
+// Liegt in roles.js, damit die Freigabelogik sie ohne diese Datei prüfen kann.
+const { ROLES, rank } = require('./roles');
 
 // Ohne Entra: Rolle über DEV_ROLE einstellbar, damit man alle drei Sichten
 // durchspielen kann, ohne einen Mandanten zu haben.

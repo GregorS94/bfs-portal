@@ -22,9 +22,17 @@ import urllib.error
 import urllib.request
 
 PORTAL_URL = os.environ.get("PORTAL_URL", "http://127.0.0.1:9001")
-AGENT_TOKEN = os.environ.get("AGENT_TOKEN", "")
 DEVICE_ID = os.environ.get("DEVICE_ID") or socket.gethostname()
 POLL_TIMEOUT = 40  # muss über dem Long-Poll-Fenster des Servers liegen
+
+# Das gemeinsame Geheimnis aus /etc/bfs-agent.env dient nur noch dem Anmelden.
+# Danach hat dieses Gerät ein eigenes Token, das nur für es selbst gilt und im
+# Portal einzeln gesperrt werden kann.
+ENROLL_TOKEN = os.environ.get("AGENT_TOKEN", "")
+TOKEN_FILE = os.environ.get("AGENT_TOKEN_FILE", "/etc/bfs-agent.token")
+
+# Wird beim Anmelden gesetzt und für alle weiteren Aufrufe verwendet.
+device_token = ""
 
 # --- Freigabeliste des Agenten -------------------------------------------------
 # Programm -> erlaubte erste Argumente (None = keine Einschränkung des Unterbefehls)
@@ -44,11 +52,13 @@ def log(msg):
     print(f"[{time.strftime('%H:%M:%S')}] {msg}", flush=True)
 
 
-def request(method, path, payload=None, timeout=30):
+def request(method, path, payload=None, timeout=30, token=None):
     url = PORTAL_URL.rstrip("/") + path
     data = json.dumps(payload).encode() if payload is not None else None
     req = urllib.request.Request(url, data=data, method=method)
-    req.add_header("Authorization", f"Bearer {AGENT_TOKEN}")
+    req.add_header("Authorization", f"Bearer {token if token is not None else device_token}")
+    # Das Portal prüft das Token gegen genau diese Gerätekennung.
+    req.add_header("X-Device-Id", DEVICE_ID)
     if data:
         req.add_header("Content-Type", "application/json")
     with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -95,10 +105,47 @@ def run(command):
     return output.strip(), proc.returncode
 
 
-def main():
-    if not AGENT_TOKEN:
-        log("FEHLER: AGENT_TOKEN ist nicht gesetzt.")
+def load_token():
+    """Liest das gerätespezifische Token, falls schon eins vergeben wurde."""
+    try:
+        with open(TOKEN_FILE, "r", encoding="utf-8") as fh:
+            return fh.read().strip()
+    except OSError:
+        return ""
+
+
+def store_token(token):
+    """Legt das Token mit 0600 ab — es ist der Schlüssel dieses Geräts."""
+    fd = os.open(TOKEN_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(token)
+
+
+def enroll(info):
+    """Meldet das Gerät mit dem gemeinsamen Geheimnis an und holt ein eigenes Token."""
+    global device_token
+    if not ENROLL_TOKEN:
+        log("FEHLER: AGENT_TOKEN ist nicht gesetzt — ohne ihn ist keine Anmeldung möglich.")
         sys.exit(1)
+
+    result = request("POST", "/api/agent/register", info, timeout=15, token=ENROLL_TOKEN)
+    token = (result or {}).get("agentToken")
+    if not token:
+        raise RuntimeError("Portal hat kein Geräte-Token geliefert.")
+
+    device_token = token
+    try:
+        store_token(token)
+    except OSError as exc:
+        # Nicht tödlich: der Agent läuft weiter, muss sich nach einem Neustart
+        # aber erneut anmelden. Das gehört gesagt, nicht verschwiegen.
+        log(f"WARNUNG: Token konnte nicht in {TOKEN_FILE} gespeichert werden ({exc}).")
+    log("Angemeldet, eigenes Geräte-Token erhalten.")
+
+
+def main():
+    global device_token
+    device_token = load_token()
 
     info = {
         "deviceId": DEVICE_ID,
@@ -109,23 +156,48 @@ def main():
 
     # Vor jeder Runde neu registrieren. Das Portal hält die Geräteliste im
     # Speicher — startet es neu, waere der Agent sonst fuer immer unsichtbar.
-    registered = False
+    # Eine erneute Anmeldung vergibt dabei ein frisches Token; das alte verfällt.
+    registered = bool(device_token)
 
     while True:
         if not registered:
             try:
-                request("POST", "/api/agent/register", info, timeout=15)
-                log(f"Registriert als {info['hostname']} ({info['platform']})")
+                # Mit gueltigem Token genuegt ein Lebenszeichen. Sich jedes Mal
+                # neu anzumelden wuerde im 40-Sekunden-Takt ein neues Token
+                # vergeben und das Audit-Log mit Anmeldungen fluten.
+                if device_token:
+                    request("POST", "/api/agent/heartbeat", info, timeout=15)
+                else:
+                    enroll(info)
+                    log(f"Registriert als {info['hostname']} ({info['platform']})")
                 registered = True
+            except urllib.error.HTTPError as e:
+                if e.code == 403:
+                    log("Dieses Gerät ist im Portal gesperrt. Warte auf Freigabe.")
+                    time.sleep(60)
+                elif e.code == 401 and device_token:
+                    # Token gesperrt oder unbekannt: beim naechsten Durchlauf
+                    # ohne Token, also ueber die richtige Anmeldung.
+                    log("Geräte-Token abgelehnt — melde neu an")
+                    device_token = ""
+                else:
+                    log(f"Anmeldung fehlgeschlagen (HTTP {e.code}) — neuer Versuch in 10 s")
+                    time.sleep(10)
+                continue
             except Exception as e:
-                log(f"Registrierung fehlgeschlagen ({e}) — neuer Versuch in 10 s")
+                log(f"Anmeldung fehlgeschlagen ({e}) — neuer Versuch in 10 s")
                 time.sleep(10)
                 continue
 
         try:
             job = request("GET", f"/api/agent/jobs?deviceId={DEVICE_ID}", timeout=POLL_TIMEOUT)
         except urllib.error.HTTPError as e:
-            log(f"HTTP {e.code} beim Abholen — registriere neu")
+            if e.code == 401:
+                # Token gesperrt oder das Portal kennt es nicht mehr.
+                log("Geräte-Token abgelehnt — melde neu an")
+                device_token = ""
+            else:
+                log(f"HTTP {e.code} beim Abholen — registriere neu")
             registered = False
             time.sleep(5)
             continue

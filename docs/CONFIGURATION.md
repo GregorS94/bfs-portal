@@ -18,7 +18,8 @@ Volume wie das Audit-Log. Treiber lesen bei jedem Zugriff frisch — eine
 | Variable | Vorgabe | Bedeutung |
 |----------|---------|-----------|
 | `ANTHROPIC_API_KEY` | — | **Pflicht.** Ohne ihn startet das Backend, aber jede Chat-Anfrage scheitert |
-| `AGENT_TOKEN` | — | **Pflicht.** Gemeinsames Geheimnis mit dem Geräte-Agenten |
+| `AGENT_TOKEN` | — | **Pflicht.** Anmelde-Token für Agenten; danach hat jedes Gerät ein eigenes |
+| `AUDIT_RETENTION_DAYS` | `0` | Aufbewahrung des Audit-Logs in Tagen; 0 = unbegrenzt |
 | `PORT` | `3000` | Port im Container |
 | `DATA_DIR` | `/data` | Ablage für Audit-Log und Einstellungen |
 | `MOCK_API_HOST` | `mock-api` | Host der Attrappen-API |
@@ -100,5 +101,11 @@ Eigene Datei `/etc/bfs-agent.env` auf dem Zielrechner, Rechte 0600.
 | Variable | Vorgabe | Bedeutung |
 |----------|---------|-----------|
 | `PORTAL_URL` | `http://127.0.0.1:9001` | Adresse des Backends |
-| `AGENT_TOKEN` | — | **Pflicht**, identisch zum Portal |
+| `AGENT_TOKEN` | — | **Pflicht** für die erste Anmeldung, identisch zum Portal |
+| `AGENT_TOKEN_FILE` | `/etc/bfs-agent.token` | Ablage des geräteeigenen Tokens, 0600 |
 | `DEVICE_ID` | Hostname | Kennung des Geräts |
+
+Nach der ersten Anmeldung braucht der Agent `AGENT_TOKEN` nicht mehr — er
+arbeitet mit dem Token aus `AGENT_TOKEN_FILE`. Löscht man diese Datei, meldet
+er sich beim nächsten Start neu an und bekommt ein frisches Token; das alte
+verfällt dabei.

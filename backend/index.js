@@ -10,6 +10,8 @@ const portalTools = require('./portal-tools');
 const settings = require('./settings');
 const auth = require('./auth');
 const store = require('./jobs');
+const agents = require('./agents');
+const { decisionProblem } = require('./approval');
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
@@ -50,28 +52,77 @@ app.get('/api/config', (req, res) => res.json(auth.publicConfig()));
 
 // ---------------------------------------------------------------- Agent-API
 
-function requireAgentToken(req, res, next) {
+function bearer(req) {
   const header = req.get('authorization') || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : '';
-  if (!AGENT_TOKEN || token !== AGENT_TOKEN) {
-    return res.status(401).json({ error: 'Agent-Token ungültig.' });
+  return header.startsWith('Bearer ') ? header.slice(7) : '';
+}
+
+/** Das gemeinsame Geheimnis aus der `.env` — gilt nur noch fürs Anmelden. */
+function requireEnrollToken(req, res, next) {
+  if (!AGENT_TOKEN || bearer(req) !== AGENT_TOKEN) {
+    return res.status(401).json({ error: 'Anmelde-Token ungültig.' });
   }
   next();
 }
 
-app.post('/api/agent/register', requireAgentToken, (req, res) => {
+/**
+ * Prüft das geräteeigene Token — und zwar gegen die deviceId aus der Anfrage.
+ * Das ist der Punkt: Ein Agent kann nur seine eigenen Aufträge abholen, nicht
+ * die eines anderen Rechners.
+ */
+function requireAgent(req, res, next) {
+  const deviceId = req.query.deviceId || req.body?.deviceId || req.get('x-device-id');
+  if (!deviceId) return res.status(400).json({ error: 'deviceId fehlt.' });
+  if (!agents.verify(deviceId, bearer(req))) {
+    return res.status(401).json({ error: 'Geräte-Token ungültig oder gesperrt.' });
+  }
+  req.deviceId = deviceId;
+  next();
+}
+
+// Anmeldung: einmal mit dem gemeinsamen Geheimnis, danach hat das Gerät ein
+// eigenes Token. Ein erneuter Aufruf vergibt ein neues und macht das alte
+// ungültig — so lässt sich ein Token rotieren, ohne das Gerät zu sperren.
+app.post('/api/agent/register', requireEnrollToken, (req, res) => {
   const { deviceId, hostname, platform, osVersion } = req.body || {};
   if (!deviceId || !hostname || !platform) {
     return res.status(400).json({ error: 'deviceId, hostname und platform sind Pflicht.' });
   }
-  res.json(store.registerDevice({ deviceId, hostname, platform, osVersion }));
+
+  let agentToken;
+  try {
+    agentToken = agents.enroll(deviceId);
+  } catch (err) {
+    if (err.code === 'REVOKED') {
+      store.audit('agent.enroll.denied', { deviceId, reason: 'gesperrt' });
+      return res.status(403).json({ error: err.message });
+    }
+    throw err;
+  }
+
+  const device = store.registerDevice({ deviceId, hostname, platform, osVersion });
+  store.audit('agent.enrolled', { deviceId, hostname, platform });
+  res.json({ ...device, agentToken });
+});
+
+// Lebenszeichen. Der Agent frischt damit "zuletzt gesehen" auf und macht sich
+// nach einem Backend-Neustart wieder sichtbar — ohne sich neu anzumelden.
+//
+// Das ist der Unterschied, der zaehlt: Anmelden vergibt ein neues Token und
+// gehoert ins Audit-Log; ein Lebenszeichen alle 40 Sekunden gehoert dort nicht
+// hinein und darf das Token nicht anfassen.
+app.post('/api/agent/heartbeat', requireAgent, (req, res) => {
+  const { hostname, platform, osVersion } = req.body || {};
+  if (!hostname || !platform) {
+    return res.status(400).json({ error: 'hostname und platform sind Pflicht.' });
+  }
+  res.json(store.registerDevice({ deviceId: req.deviceId, hostname, platform, osVersion }));
 });
 
 // Der Agent hält diese Anfrage offen, bis ein Auftrag da ist. Dadurch braucht
 // das Portal keine eingehende Verbindung zum Client.
-app.get('/api/agent/jobs', requireAgentToken, async (req, res) => {
-  const { deviceId } = req.query;
-  if (!deviceId) return res.status(400).json({ error: 'deviceId fehlt.' });
+app.get('/api/agent/jobs', requireAgent, async (req, res) => {
+  const deviceId = req.deviceId;
   store.touchDevice(deviceId);
 
   const job = await store.waitForJob(deviceId);
@@ -87,7 +138,7 @@ app.get('/api/agent/jobs', requireAgentToken, async (req, res) => {
   }
 });
 
-app.post('/api/agent/jobs/:id/result', requireAgentToken, (req, res) => {
+app.post('/api/agent/jobs/:id/result', requireAgent, (req, res) => {
   const { output, exitCode, error } = req.body || {};
   const job = store.completeJob(req.params.id, { output, exitCode, error });
   if (!job) return res.status(404).json({ error: 'Auftrag unbekannt.' });
@@ -177,6 +228,28 @@ app.post('/api/admin/settings/:group/test', auth.requireUser, auth.requireRole('
 
 // Wissensdatenbank: nur lesen, für alle Rollen. Ohne Konfiguration 503 statt
 // stiller Leerantwort — sonst sieht "nichts gefunden" wie ein Suchergebnis aus.
+// Geräte-Token verwalten. Sperren wirkt sofort: der nächste Long-Poll des
+// Agenten läuft in ein 401, und neu anmelden kann er sich auch nicht.
+app.get('/api/admin/agents', auth.requireUser, auth.requireRole('admin'), (req, res) => {
+  res.json({ agents: agents.list() });
+});
+
+app.post('/api/admin/agents/:deviceId/revoke', auth.requireUser, auth.requireRole('admin'), (req, res) => {
+  if (!agents.revoke(req.params.deviceId)) {
+    return res.status(404).json({ error: 'Gerät unbekannt.' });
+  }
+  store.audit('agent.revoked', { deviceId: req.params.deviceId, by: req.user.id });
+  res.json({ ok: true });
+});
+
+app.post('/api/admin/agents/:deviceId/unrevoke', auth.requireUser, auth.requireRole('admin'), (req, res) => {
+  if (!agents.unrevoke(req.params.deviceId)) {
+    return res.status(404).json({ error: 'Gerät unbekannt.' });
+  }
+  store.audit('agent.unrevoked', { deviceId: req.params.deviceId, by: req.user.id });
+  res.json({ ok: true });
+});
+
 app.get('/api/knowledge', auth.requireUser, async (req, res) => {
   if (!atlassian.isConfigured()) {
     return res.status(503).json({ error: 'Confluence ist nicht konfiguriert.' });
@@ -290,18 +363,11 @@ app.get('/api/jobs/:id', auth.requireUser, (req, res) => {
   res.json(job);
 });
 
-// Freigeben darf, wer den Auftrag selbst ausgelöst hat (Einwilligung für das
-// eigene Gerät) — oder IT und Admin für beliebige Aufträge.
-function mayDecide(user, job) {
-  return job.requestedBy === user.id || auth.rank(user.role) >= auth.rank('it');
-}
-
 app.post('/api/jobs/:id/approve', auth.requireUser, async (req, res) => {
   const pending = store.getJob(req.params.id);
   if (!pending) return res.status(404).json({ error: 'Auftrag unbekannt.' });
-  if (!mayDecide(req.user, pending)) {
-    return res.status(403).json({ error: 'Dieser Auftrag gehört dir nicht.' });
-  }
+  const problem = decisionProblem(req.user, pending, auth.rank);
+  if (problem) return res.status(403).json({ error: problem });
 
   const job = store.approveJob(req.params.id, req.user.id);
   if (!job) return res.status(404).json({ error: 'Auftrag unbekannt.' });
@@ -322,9 +388,9 @@ app.post('/api/jobs/:id/approve', auth.requireUser, async (req, res) => {
 app.post('/api/jobs/:id/deny', auth.requireUser, (req, res) => {
   const pending = store.getJob(req.params.id);
   if (!pending) return res.status(404).json({ error: 'Auftrag unbekannt.' });
-  if (!mayDecide(req.user, pending)) {
-    return res.status(403).json({ error: 'Dieser Auftrag gehört dir nicht.' });
-  }
+  const problem = decisionProblem(req.user, pending, auth.rank);
+  if (problem) return res.status(403).json({ error: problem });
+
   const job = store.denyJob(req.params.id, req.user.id);
   if (!job) return res.status(404).json({ error: 'Auftrag unbekannt.' });
   res.json(job);
@@ -705,7 +771,41 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Aufbewahrungsfrist: ohne AUDIT_RETENTION_DAYS passiert nichts, das Log
+// waechst dann unbegrenzt. Fuer den Produktivbetrieb ist eine Frist Pflicht —
+// das Log enthaelt Personenbezug.
+const RETENTION_DAYS = Number(process.env.AUDIT_RETENTION_DAYS || 0);
+
+function runPrune() {
+  try {
+    const { removed } = store.pruneAudit(RETENTION_DAYS);
+    if (removed) {
+      console.log(`Audit-Log: ${removed} Einträge älter als ${RETENTION_DAYS} Tage entfernt.`);
+    }
+  } catch (err) {
+    console.error('Audit-Log konnte nicht bereinigt werden:', err.message);
+  }
+}
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Backend läuft auf Port ${PORT} (Modell: ${MODEL}, Aktionen: ${Object.keys(ACTIONS).length})`);
+
+  const chain = store.verifyAudit();
+  if (chain.ok) {
+    console.log(`Audit-Log: ${chain.entries} Einträge, Kette unversehrt.`);
+  } else {
+    // Laut, aber kein Startabbruch: ein gebrochenes Log ist ein Befund, kein
+    // Grund, den Support stillzulegen.
+    console.error(`⚠️  Audit-Log: Kette gebrochen — ${chain.problems.length} Problem(e).`);
+    for (const problem of chain.problems.slice(0, 5)) {
+      console.error(`    Zeile ${problem.line}: ${problem.reason}`);
+    }
+  }
+
+  if (RETENTION_DAYS) {
+    runPrune();
+    setInterval(runPrune, 24 * 60 * 60 * 1000).unref();
+    console.log(`Audit-Log: Aufbewahrung ${RETENTION_DAYS} Tage.`);
+  }
 });

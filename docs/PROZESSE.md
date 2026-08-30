@@ -93,11 +93,13 @@ Auslöser: jede Änderung an Code oder Konfiguration.
 
 Nachweis: Git-Historie. Sie belegt wer, wann, was und warum.
 
-**Lücke:** Produktiv fehlt das Vier-Augen-Prinzip. Änderungen gehen heute
-direkt auf `main`. → Pull Requests mit Freigabe durch eine zweite Person,
-`main` schützen.
+**Offen:** Änderungen gehen heute direkt auf `main`. Die Vorlage unter
+`.github/pull_request_template.md` steht bereit; die Freigabepflicht selbst ist
+eine Repository-Einstellung und muss dort gesetzt werden — Anleitung in
+[`OPERATIONS.md`](OPERATIONS.md).
 
-**Lücke:** Test- und Produktivumgebung sind nicht getrennt.
+*Erledigt:* Test- und Produktivumgebung sind über `docker-compose.staging.yml`
+getrennt (eigene Ports, eigenes Volume).
 
 ### P2 — Freigabe von Eingriffen
 
@@ -111,9 +113,10 @@ Nachweis: Audit-Log mit Auftrag, freigebender Person und Ergebnis.
 
 Das erfüllt zugleich die menschliche Aufsicht über das KI-System.
 
-**Lücke:** Für besonders eingriffsintensive Aktionen — Passwort zurücksetzen,
-Konto entsperren — sollte die Freigabe durch eine **andere** Person als die
-anfragende erfolgen. Heute kann ein `user` seinen eigenen Auftrag freigeben.
+*Erledigt:* `reset_ad_password` und `unlock_ad_account` tragen `fourEyes: true`.
+Die anfragende Person kann den eigenen Auftrag nicht freigeben; es braucht
+mindestens Rolle `it`. Logik in `backend/approval.js`, geprüft in
+`tools/approval-test.js`.
 
 ### P3 — Behandlung und Meldung von IKT-Vorfällen
 
@@ -158,8 +161,9 @@ zentrale Rechteverwaltung.
   eine regelmäßige Überprüfung).
 - Kein definierter Prozess für den Entzug beim Austritt; hängt heute an der
   Entra-Gruppe, das ist bereits die richtige Stelle → als Prozess festhalten.
-- Das Agent-Token ist ein einziges gemeinsames Geheimnis für alle Geräte, ohne
-  Rotation und ohne Möglichkeit, ein einzelnes Gerät zu sperren.
+*Erledigt:* Jedes Gerät hat ein eigenes Token, das gegen seine Kennung geprüft
+wird. Rotation über eine erneute Anmeldung, Sperren über
+`POST /api/admin/agents/:deviceId/revoke`. Gespeichert wird nur der Hash.
 
 ### P5 — Protokollierung und Aufbewahrung
 
@@ -169,14 +173,17 @@ Das Backend schreibt `/data/audit.jsonl` — nie das Modell. Erfasst werden
 Auftragserstellung, Freigabe, Ergebnis, Ticketerstellung,
 Einstellungsänderungen (nur Feldnamen, nie Werte).
 
-**Lücken, alle vor dem Produktivbetrieb zu schließen:**
-- **Keine Aufbewahrungs- und Löschfrist.** Das Log wächst unbegrenzt. Es
-  enthält Personenbezug (wer hat wann was veranlasst), damit braucht es eine
-  begründete Frist und ein automatisches Löschen. → Frist mit
-  Datenschutzbeauftragten und Betriebsrat festlegen.
-- **Kein Manipulationsschutz.** Wer Zugriff auf den Host hat, kann die Datei
-  ändern. Für einen Nachweis gegenüber der Aufsicht zu wenig → Weiterleitung
-  an ein zentrales, schreibgeschütztes Log-System.
+*Erledigt:* Die Einträge sind über Hashes verkettet — nachträgliche Änderungen
+und entfernte Zeilen werden sichtbar (`tools/audit-verify.js`, Prüfung auch bei
+jedem Start). `AUDIT_RETENTION_DAYS` löscht Altes und protokolliert die
+Löschung selbst.
+
+**Lücken, die bleiben:**
+- **Die Frist ist noch nicht festgelegt.** Die Technik steht, die Zahl fehlt —
+  sie gehört mit Datenschutz und Betriebsrat bestimmt.
+- **Die Kette schützt nicht gegen vollständiges Neuschreiben.** Wer alle Hashes
+  konsistent nachrechnet, bleibt unentdeckt. Dagegen hilft nur, das Log auf ein
+  System auszuleiten, auf dem der Portal-Host keine Schreibrechte hat.
 - **Keine Sicherung.** Das Volume liegt auf einer SD-Karte.
 - Zweckbindung: Das Log dient dem Nachweis, nicht der Leistungskontrolle. Das
   gehört ausdrücklich in die Betriebsvereinbarung.
@@ -234,13 +241,19 @@ organisatorisch und dauern am längsten, deshalb zuerst anstoßen.
 1. Anwendbarkeit von DORA klären (Compliance).
 2. Betriebsvereinbarung zum Audit-Log (Betriebsrat).
 3. AVV und Drittlandtransfer mit Anthropic, DSFA prüfen (Datenschutz).
-4. Aufbewahrungsfrist für das Audit-Log festlegen und technisch umsetzen.
-5. Vier-Augen-Prinzip für Passwort- und Kontoaktionen.
-6. Pull-Request-Pflicht auf `main`, Test- und Produktivumgebung trennen.
-7. Audit-Log manipulationssicher auslagern und sichern.
-8. Agent-Token je Gerät statt eines gemeinsamen Geheimnisses.
+4. Aufbewahrungsfrist für das Audit-Log **als Zahl** festlegen — die Technik
+   dafür steht, `AUDIT_RETENTION_DAYS` ist nur noch zu setzen.
+5. ~~Vier-Augen-Prinzip für Passwort- und Kontoaktionen.~~ **erledigt**
+6. Pull-Request-Pflicht auf `main` — Repository-Einstellung, siehe
+   [`OPERATIONS.md`](OPERATIONS.md). ~~Test- und Produktivumgebung trennen.~~
+   **erledigt**
+7. Audit-Log auf ein fremdes System ausleiten und sichern. Die Verkettung
+   macht Manipulation sichtbar, ersetzt aber keine Ausleitung.
+8. ~~Agent-Token je Gerät statt eines gemeinsamen Geheimnisses.~~ **erledigt** —
+   offen bleibt, `AGENT_TOKEN` nach dem Ausrollen zu rotieren.
 9. Vorfallprozess mit benannter Erreichbarkeit hinterlegen.
 10. Wiederanlauf dokumentieren und einmal üben.
 
-Punkt 5, 6, 7 und 8 sind Arbeit am Code und ließen sich hier erledigen. Alles
-andere braucht Menschen mit Zuständigkeit.
+Was übrig ist, braucht entweder eine Entscheidung (Punkt 4), eine
+Repository-Einstellung (6) oder Menschen mit Zuständigkeit (9, 10) —
+und mit Punkt 7 eine Infrastruktur, die es hier noch nicht gibt.
