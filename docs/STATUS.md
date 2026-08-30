@@ -68,6 +68,13 @@ Seitenkörper nachgeladen und aus dem XHTML Fließtext gemacht.
    weg. Das Audit-Log überlebt.
 7. **Die Windows-Varianten der Aktionen sind nie auf Windows gelaufen.**
 
+## Vor einem Produktivbetrieb
+
+BFS Abrechnung steht unter BaFin-Aufsicht. Damit hängt an einer produktiven
+Einführung mehr als Technik: Auslagerungsmanagement, Vorfallmeldung,
+Aufbewahrungsfristen, Mitbestimmung. Aufstellung samt Lückenliste in
+[`PROZESSE.md`](PROZESSE.md).
+
 ## Bekannte Einschränkungen der Umgebung
 
 Das System liegt auf einer SD-Karte, nicht auf einer SSD. Für einen Prototyp

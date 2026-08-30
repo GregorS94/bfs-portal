@@ -85,6 +85,7 @@ ob etwas gesetzt ist.
 | [`docs/API.md`](docs/API.md) | Alle 23 Endpunkte mit Rollen |
 | [`docs/OPERATIONS.md`](docs/OPERATIONS.md) | Tests, Attrappen, Statusprüfung, bekannte Fallstricke |
 | [`docs/ENTRA_SETUP.md`](docs/ENTRA_SETUP.md) | App-Registrierung in Entra ID |
+| [`docs/PROZESSE.md`](docs/PROZESSE.md) | Prozesse und aufsichtsrechtliche Einordnung (DORA, MaRisk, DSGVO, AI Act) |
 | [`docs/STATUS.md`](docs/STATUS.md) | Was verifiziert ist, was offen ist |
 
 ## Tests
