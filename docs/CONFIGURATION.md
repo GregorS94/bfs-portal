@@ -37,9 +37,44 @@ Volume wie das Audit-Log. Treiber lesen bei jedem Zugriff frisch — eine
 | `DEV_ROLE` | `admin` | Rolle des Entwicklungs-Benutzers, wenn Entra aus ist |
 | `DEV_USER_ID` | `dev@bfs.local` | Kennung des Entwicklungs-Benutzers. Zum Durchspielen des Vier-Augen-Prinzips ohne Entra: zwei Instanzen mit verschiedenen Kennungen starten |
 | `DEV_USER_NAME` | `Entwicklungs-Benutzer` | Anzeigename des Entwicklungs-Benutzers |
+| `SIMPLE_LOGIN` | `false` | `true` schaltet den einfachen Anmeldeweg frei (nur wirksam, wenn `ENTRA_ENABLED` aus ist) |
+| `SIMPLE_LOGIN_SECRET` | je Start erzeugt | Schlüssel für die Sitzungen des einfachen Wegs. Ohne festen Wert sind alle nach einem Neustart abgemeldet |
+
+**Drei Anmeldewege, genau einer ist zu jeder Zeit aktiv.** Das Backend meldet
+den aktiven Weg unter `GET /api/config` als `mode`:
+
+| `mode` | wann | was geprüft wird |
+|--------|------|------------------|
+| `entra` | `ENTRA_ENABLED=true` | Microsoft-Token gegen die JWKS des Mandanten. Der einzige Weg für den Echtbetrieb |
+| `simple` | sonst, mit `SIMPLE_LOGIN=true` | **nichts.** Der Nutzer tippt einen Namen, das Portal glaubt ihn |
+| `off` | sonst | fester Entwicklungs-Benutzer aus `DEV_USER_ID` |
 
 Rollen in der Reihenfolge ihrer Rechte: `user` → `it` → `admin`.
 Bevorzugte Quelle sind die Entra-App-Rollen `portal.it` und `portal.admin`.
+Im Modus `simple` kommen die Rollen aus `ENTRA_IT_USERS` / `ENTRA_ADMIN_USERS` —
+dieselben Listen, damit es nicht zwei Quellen der Wahrheit gibt.
+
+**`simple` ist keine Authentifizierung.** Wer den Anmeldenamen eines anderen
+eintippt, ist im Portal dieser andere — auch mit dessen Rolle, wenn er in den
+Namenslisten steht. Der Weg ist für den Prototyp gedacht: die Sitzung ist im
+Portal sichtbar als „Identität ungeprüft" markiert und im Audit-Log als
+`verified: false` vermerkt. Für den Echtbetrieb `ENTRA_ENABLED=true`.
+
+## Öffentliche Passwort-Hilfe
+
+`POST /api/public/password-help` ist die einzige Route, die ohne Anmeldung
+etwas anlegt — sie muss es sein, denn wer sein Passwort vergessen hat, kommt
+nicht ins Portal.
+
+| Variable | Vorgabe | Bedeutung |
+|----------|---------|-----------|
+| `PUBLIC_RATE_MAX` | `5` | Anfragen je Absender im Zeitfenster |
+| `PUBLIC_RATE_WINDOW_MINUTES` | `15` | Länge des Zeitfensters |
+
+Die Zählung läuft über `req.ip`. Das Backend vertraut dafür genau einem
+Zwischenschritt (`app.set('trust proxy', 1)`) — nginx. Steht ein weiterer
+Proxy davor, muss dieser Wert mitwachsen, sonst landen alle Absender in einem
+Topf.
 
 **Unvollständig konfiguriert blockiert.** `ENTRA_ENABLED=true` ohne die drei
 IDs liefert 500 auf allen Portal-Routen, statt still auf den

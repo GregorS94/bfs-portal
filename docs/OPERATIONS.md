@@ -36,6 +36,8 @@ node tools/settings-test.js     # 11 Prüfungen: Geheimnisse, Vorrang, Rollen
 node tools/approval-test.js     # 20 Prüfungen: Freigaberechte, Vier-Augen
 node tools/audit-test.js        # 18 Prüfungen: Hash-Kette, Aufbewahrung
 node tools/agents-test.js       # 22 Prüfungen: Geräte-Token, Sperren
+node tools/simple-auth-test.js  # 24 Prüfungen: einfacher Anmeldeweg, Fälschung, Ablauf
+node tools/password-help-test.js # 20 Prüfungen: Passwort-Anfragen, Neustart
 ```
 
 Alle sieben laufen ohne Server und ohne installierte Abhängigkeiten.

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { LogOut, Users, Wrench, Settings } from 'lucide-react';
-import { initAuth, authedFetch, signIn, signOut, account, authConfig } from './auth';
+import { initAuth, authedFetch, signIn, signOut, account, mode as authMode, simpleSignIn } from './auth';
 import UserPortal from './views/UserPortal';
 import ITArea from './views/ITArea';
 import AdminArea from './views/AdminArea';
+import LoginScreen from './views/LoginScreen';
 
 // Drei getrennte Bereiche unter eigenen Adressen. Kein Router als Abhängigkeit —
 // nginx liefert für jeden Pfad dieselbe index.html, den Rest macht history.pushState.
@@ -39,7 +40,9 @@ export default function App() {
     const boot = async () => {
       try {
         const cfg = await initAuth();
-        if (cfg.authEnabled && !account()) {
+        // 'off' meldet den Entwicklungs-Benutzer an, alle anderen Wege brauchen
+        // erst eine Sitzung.
+        if (authMode() !== 'off' && !account()) {
           setNeedsSignIn(true);
           setAuthReady(true);
           return;
@@ -51,27 +54,27 @@ export default function App() {
         setAuthenticated(true);
       } catch (error) {
         console.error('Anmeldung fehlgeschlagen:', error);
-        setNeedsSignIn(authConfig().authEnabled);
+        setNeedsSignIn(authMode() !== 'off');
       }
       setAuthReady(true);
     };
     boot();
   }, []);
 
+  const onSimpleSignIn = async (identity) => {
+    const signedIn = await simpleSignIn(identity);
+    setUser(signedIn);
+    setAuthenticated(true);
+  };
+
   if (!authenticated) {
     return (
-      <div className="flex items-center justify-center h-screen bg-[#0b0f16]">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold text-slate-100 mb-4">🚀 BFS IT Support</h1>
-          <p className="text-slate-500 mb-6">Self-Service Portal</p>
-          {needsSignIn && authReady && (
-            <button onClick={signIn} className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-medium text-sm transition-colors shadow-lg shadow-indigo-600/20">
-              Mit Microsoft 365 anmelden
-            </button>
-          )}
-          {!needsSignIn && <p className="text-sm text-slate-500">Einen Moment…</p>}
-        </div>
-      </div>
+      <LoginScreen
+        mode={authMode()}
+        ready={authReady && needsSignIn}
+        onSimpleSignIn={onSimpleSignIn}
+        onEntraSignIn={signIn}
+      />
     );
   }
 
@@ -96,6 +99,13 @@ export default function App() {
           }`}>
             {ROLE_LABEL[user?.role] || user?.role}
           </span>
+          {user?.authMode === 'simple' && (
+            // Muss sichtbar bleiben: sonst sieht der einfache Weg im Betrieb
+            // genauso aus wie eine geprüfte Anmeldung.
+            <p className="mt-2 text-[10px] leading-snug text-amber-300/90">
+              Testbetrieb — Identität ungeprüft
+            </p>
+          )}
         </div>
 
         <nav className="flex-1 p-3 space-y-1">
@@ -120,7 +130,7 @@ export default function App() {
         </nav>
 
         <div className="p-3 border-t border-slate-800">
-          <button onClick={() => (authConfig().authEnabled ? signOut() : setAuthenticated(false))}
+          <button onClick={() => (authMode() === 'off' ? setAuthenticated(false) : signOut())}
             className="w-full flex items-center gap-2 px-3 py-2 text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 rounded-xl text-sm transition-colors">
             <LogOut size={16} /> Abmelden
           </button>

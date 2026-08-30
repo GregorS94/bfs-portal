@@ -7,7 +7,16 @@
 import { PublicClientApplication, InteractionRequiredAuthError } from '@azure/msal-browser';
 
 let msal = null;
-let config = { authEnabled: false };
+let config = { authEnabled: false, mode: 'off' };
+
+// Sitzung des einfachen Anmeldewegs. sessionStorage statt localStorage: mit dem
+// Schliessen des Fensters ist man abgemeldet.
+const SIMPLE_KEY = 'bfs.simple.token';
+const simpleToken = () => sessionStorage.getItem(SIMPLE_KEY) || '';
+
+export function mode() {
+  return config.mode || (config.authEnabled ? 'entra' : 'off');
+}
 
 export function authConfig() {
   return config;
@@ -40,7 +49,22 @@ export async function initAuth() {
 }
 
 export function account() {
+  if (mode() === 'simple') return simpleToken() ? { username: 'simple' } : null;
   return msal?.getActiveAccount() || null;
+}
+
+// Einfacher Anmeldeweg: nur ein Name, kein Passwort. Das Backend stellt darauf
+// eine kurzlebige Sitzung aus — geprueft wurde nichts, das steht auch so im Log.
+export async function simpleSignIn(identity) {
+  const res = await fetch('/api/auth/simple', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ identity })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  sessionStorage.setItem(SIMPLE_KEY, data.token);
+  return data.user;
 }
 
 export function signIn() {
@@ -48,6 +72,11 @@ export function signIn() {
 }
 
 export function signOut() {
+  if (mode() === 'simple') {
+    sessionStorage.removeItem(SIMPLE_KEY);
+    window.location.reload();
+    return undefined;
+  }
   return msal.logoutRedirect();
 }
 
@@ -68,6 +97,10 @@ async function accessToken() {
 
 // Ersatz für fetch: hängt bei aktiver Anmeldung das Token an.
 export async function authedFetch(url, options = {}) {
+  if (mode() === 'simple') {
+    const headers = { ...(options.headers || {}), Authorization: `Bearer ${simpleToken()}` };
+    return fetch(url, { ...options, headers });
+  }
   if (!config.authEnabled) return fetch(url, options);
 
   const token = await accessToken();

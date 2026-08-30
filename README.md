@@ -60,12 +60,32 @@ Geräte-Agent: [`docs/SETUP.md`](docs/SETUP.md).
 
 | Pfad | Bereich | Mindestrolle |
 |------|---------|--------------|
-| `/` | Mitarbeitende: Chat, eigene Freigaben, Passwort, Software | `user` |
-| `/it` | IT-Support: Aufträge, Geräte, Audit-Log, fremde Freigaben | `it` |
+| `/` | Mitarbeitende: Chat, eigene Freigaben, Passwort-Hilfe, Software | `user` |
+| `/it` | IT-Support: Aufträge, Geräte, Passwort-Hilfe, Audit-Log, fremde Freigaben | `it` |
 | `/admin` | Administration: Dienste-Status, Zugangsdaten | `admin` |
 
 Rollen kommen aus Entra-App-Rollen (`portal.it`, `portal.admin`), ersatzweise
 aus `ENTRA_IT_USERS` / `ENTRA_ADMIN_USERS`, ohne Entra aus `DEV_ROLE`.
+
+## Anmelden — und der Fall, in dem das nicht geht
+
+Es gibt drei Anmeldewege, immer genau einen: `entra` (Microsoft 365, geprüft),
+`simple` (nur ein Name, **ungeprüft**, ausschliesslich für den Prototyp) und
+`off` (fester Entwicklungs-Benutzer). Details in
+[`docs/CONFIGURATION.md`](docs/CONFIGURATION.md).
+
+Wer sein Passwort vergessen hat, kommt durch keinen dieser Wege — genau dann
+braucht er das Portal aber. Deshalb liegt **„Passwort vergessen" vor der
+Anmeldung**: Anmeldename eintragen, optional eine Rückrufnummer. Daraus wird
+ein Eintrag im Arbeitsvorrat der IT und, wenn Jira konfiguriert ist, ein
+Ticket.
+
+Was dabei ausdrücklich **nicht** passiert: Es wird nichts zurückgesetzt und
+nichts entsperrt. Die IT prüft die Identität ausserhalb des Portals — Rückruf,
+Personalnummer, Ausweis — und löst danach `reset_ad_password` aus, das eine
+zweite Person aus der IT freigeben muss. Die Antwort des offenen Endpunkts ist
+immer dieselbe, auch bei unbekanntem Konto; sonst wäre er ein Verzeichnis
+aller Anmeldenamen des Hauses.
 
 ![Administration: Dienste-Status und Zugangsdaten](docs/screenshots/administration.png)
 

@@ -4,6 +4,7 @@ const crypto = require('crypto');
 
 const DATA_DIR = process.env.DATA_DIR || '/data';
 const AUDIT_FILE = path.join(DATA_DIR, 'audit.jsonl');
+const PASSWORD_FILE = path.join(DATA_DIR, 'password-requests.jsonl');
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
@@ -325,8 +326,81 @@ function waitForResult(id, timeoutMs = 30_000) {
   });
 }
 
+
+// --- Passwort-Hilfe ------------------------------------------------------------
+//
+// Wer sein Passwort vergessen hat, kommt nicht ins Portal. Diese Anfragen
+// entstehen deshalb ohne Anmeldung und liegen als Arbeitsvorrat fuer die IT.
+// Anders als Auftraege ueberleben sie einen Neustart: sonst faellt genau die
+// Anfrage weg, auf die jemand wartet.
+
+const passwordRequests = new Map();
+
+function loadPasswordRequests() {
+  if (!fs.existsSync(PASSWORD_FILE)) return;
+  for (const line of fs.readFileSync(PASSWORD_FILE, 'utf8').split('\n').filter(Boolean)) {
+    try {
+      const entry = JSON.parse(line);
+      passwordRequests.set(entry.id, entry);
+    } catch {
+      // Beschaedigte Zeile ueberspringen statt den Start zu verhindern.
+    }
+  }
+}
+loadPasswordRequests();
+
+function persistPasswordRequests() {
+  const lines = [...passwordRequests.values()].map((r) => JSON.stringify(r));
+  fs.writeFileSync(PASSWORD_FILE, lines.length ? lines.join('\n') + '\n' : '');
+}
+
+function createPasswordRequest({ identity, contact, note, source, remote }) {
+  const entry = {
+    id: crypto.randomUUID(),
+    identity,
+    contact: contact || '',
+    note: note || '',
+    // 'public' = ohne Anmeldung gestellt, 'portal' = aus der angemeldeten Sitzung.
+    source,
+    remote: remote || '',
+    status: 'open',
+    ticket: null,
+    createdAt: new Date().toISOString(),
+    closedAt: null,
+    closedBy: null
+  };
+  passwordRequests.set(entry.id, entry);
+  persistPasswordRequests();
+  return entry;
+}
+
+function attachTicket(id, ticket) {
+  const entry = passwordRequests.get(id);
+  if (!entry) return null;
+  entry.ticket = ticket;
+  persistPasswordRequests();
+  return entry;
+}
+
+function listPasswordRequests(limit = 100) {
+  return [...passwordRequests.values()]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, limit);
+}
+
+function closePasswordRequest(id, closedBy) {
+  const entry = passwordRequests.get(id);
+  if (!entry) return null;
+  entry.status = 'closed';
+  entry.closedAt = new Date().toISOString();
+  entry.closedBy = closedBy;
+  persistPasswordRequests();
+  return entry;
+}
+
 module.exports = {
   audit, readAudit, verifyAudit, pruneAudit, registerDevice, touchDevice, listDevices,
   createJob, approveJob, denyJob, waitForJob, completeJob,
-  getJob, listJobs, waitForResult
+  getJob, listJobs, waitForResult,
+  createPasswordRequest, listPasswordRequests, closePasswordRequest, attachTicket
 };

@@ -8,6 +8,7 @@
 // keinen Zwischenzustand, in dem ein ungültiges Token stillschweigend als
 // Entwicklungs-Benutzer durchrutscht — genau so entstehen Auth-Lücken.
 
+const crypto = require('crypto');
 const { createRemoteJWKSet, jwtVerify } = require('jose');
 
 const CONFIG = {
@@ -42,23 +43,42 @@ const DEV_USER = {
   authenticated: false
 };
 
+// --- Anmeldeweg ---------------------------------------------------------------
+//
+// 'entra'  Microsoft 365, Token wird geprueft. Der einzige Weg fuer den Echtbetrieb.
+// 'simple' Der Nutzer tippt nur seinen Namen. Das ist KEINE Authentifizierung,
+//          sondern eine Behauptung — niemand prueft sie. Nur fuer den Prototyp,
+//          und im Portal wie im Audit-Log ausdruecklich als ungeprueft markiert.
+// 'off'    Fester Entwicklungs-Benutzer wie bisher.
+const MODE = CONFIG.enabled ? 'entra' : process.env.SIMPLE_LOGIN === 'true' ? 'simple' : 'off';
+
+// Ohne gesetztes Geheimnis wird eines je Start erzeugt: dann gelten ausgestellte
+// Sitzungen nur bis zum naechsten Neustart. Das ist fuer einen Prototyp richtig
+// herum — lieber abgemeldet als ein Geheimnis, das jeder kennt.
+const SIMPLE_SECRET = process.env.SIMPLE_LOGIN_SECRET || crypto.randomBytes(32).toString('hex');
+const SIMPLE_TTL_MS = 12 * 60 * 60 * 1000;
+
+const simpleAuth = require('./simple-auth');
+const IDENTITY = simpleAuth.IDENTITY;
+const signSimpleToken = (identity) => simpleAuth.signToken(identity, SIMPLE_SECRET, SIMPLE_TTL_MS);
+const verifySimpleToken = (token) => simpleAuth.verifyToken(token, SIMPLE_SECRET);
+
 // Wer welche Rolle bekommt, wenn Entra aktiv ist. Bevorzugt werden App-Rollen
 // aus dem Token; die Namenslisten sind der Notnagel für Testmandanten, in denen
 // noch keine App-Rollen angelegt sind.
 const ADMIN_USERS = (process.env.ENTRA_ADMIN_USERS || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
 const IT_USERS = (process.env.ENTRA_IT_USERS || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
 
+function roleFromName(name) {
+  return simpleAuth.roleFromName(name, ADMIN_USERS, IT_USERS);
+}
+
 function roleFromClaims(claims) {
   const appRoles = (claims.roles || []).map((r) => String(r).toLowerCase());
   if (appRoles.includes('portal.admin') || appRoles.includes('admin')) return 'admin';
   if (appRoles.includes('portal.it') || appRoles.includes('it')) return 'it';
 
-  const name = String(claims.preferred_username || claims.upn || '').toLowerCase();
-  if (ADMIN_USERS.includes(name)) return 'admin';
-  if (IT_USERS.includes(name)) return 'it';
-
-  // Standard ist die kleinste Rolle. Wer mehr darf, muss ausdrücklich benannt sein.
-  return 'user';
+  return roleFromName(claims.preferred_username || claims.upn || '');
 }
 
 let jwks = null;
@@ -90,8 +110,30 @@ async function verifyToken(token) {
 // Express-Middleware. Bei ausgeschalteter Anmeldung wird der Entwicklungs-
 // Benutzer gesetzt, sonst wird das Token geprüft.
 async function requireUser(req, res, next) {
-  if (!CONFIG.enabled) {
-    req.user = DEV_USER;
+  if (MODE === 'off') {
+    req.user = { ...DEV_USER, authMode: 'off' };
+    return next();
+  }
+
+  if (MODE === 'simple') {
+    const header = req.get('authorization') || '';
+    if (!header.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Nicht angemeldet.' });
+    }
+    const claims = verifySimpleToken(header.slice(7));
+    if (!claims) {
+      return res.status(401).json({ error: 'Sitzung abgelaufen oder ungueltig.' });
+    }
+    req.user = {
+      id: claims.id,
+      displayName: claims.id,
+      email: claims.id.includes('@') ? claims.id : '',
+      department: '',
+      role: roleFromName(claims.id),
+      // Bleibt bewusst false: die Kennung wurde behauptet, nicht geprueft.
+      authenticated: false,
+      authMode: 'simple'
+    };
     return next();
   }
 
@@ -116,7 +158,8 @@ async function requireUser(req, res, next) {
       role: roleFromClaims(claims),
       oid: claims.oid,
       groups: claims.groups || [],
-      authenticated: true
+      authenticated: true,
+      authMode: 'entra'
     };
     next();
   } catch (err) {
@@ -142,6 +185,7 @@ function requireRole(minimum) {
 function publicConfig() {
   return {
     authEnabled: CONFIG.enabled,
+    mode: MODE,
     tenantId: CONFIG.tenantId,
     clientId: CONFIG.clientId,
     apiScope: CONFIG.apiScope,
@@ -149,4 +193,7 @@ function publicConfig() {
   };
 }
 
-module.exports = { requireUser, requireRole, publicConfig, CONFIG, DEV_USER, ROLES, rank };
+module.exports = {
+  requireUser, requireRole, publicConfig, CONFIG, DEV_USER, ROLES, rank,
+  MODE, IDENTITY, signSimpleToken, verifySimpleToken, roleFromName
+};

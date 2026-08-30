@@ -107,6 +107,38 @@ ungeprüften Benutzer wäre die gefährlichere Variante.
 Die Agent-API hängt an einem eigenen Token, nicht an Entra — ein Dienst hat
 keine interaktive Anmeldung.
 
+### Der Modus `simple` authentifiziert nicht
+
+`SIMPLE_LOGIN=true` erlaubt die Anmeldung mit blossem Namen. Das Backend stellt
+darauf eine HMAC-signierte Sitzung aus. Diese Signatur schützt **nur davor, dass
+der Browser die Kennung nachträglich ändert** — sie sagt nichts darüber aus, ob
+die Person die ist, die sie behauptet zu sein. Wer den Namen eines Kollegen
+eintippt, ist im Portal dieser Kollege, samt dessen Rolle.
+
+Das ist bewusst so und ausschliesslich für den Prototyp. Damit es nicht später
+mit einer echten Anmeldung verwechselt wird:
+
+- `user.authenticated` bleibt `false`, `user.authMode` ist `simple`
+- das Audit-Log schreibt `auth.simple.login` mit `verified: false`
+- die Oberfläche zeigt am Anmeldebildschirm und dauerhaft in der Seitenleiste
+  „Identität ungeprüft"
+
+Für den Echtbetrieb ist `ENTRA_ENABLED=true` der einzige zulässige Weg.
+
+### Passwort-Hilfe ohne Anmeldung
+
+Wer sein Passwort vergessen hat, kann sich nicht anmelden — der Weg dorthin
+muss also offen sein. Drei Eigenschaften halten das im Rahmen:
+
+1. **Keine Auskunft über den Bestand.** Die Antwort ist immer dieselbe, egal ob
+   es das Konto gibt, ob ein Ticket entstanden ist oder ob die Begrenzung
+   gegriffen hat. Sonst wäre die Route ein Verzeichnis aller Anmeldenamen.
+2. **Begrenzung je Absender** über `req.ip`, vorgabegemäss fünf Anfragen in
+   fünfzehn Minuten.
+3. **Kein Automatismus.** Die Route setzt nichts zurück und ändert kein Konto.
+   Sie legt einen Eintrag für die IT an. Das Zurücksetzen selbst bleibt
+   `reset_ad_password` — mit Vier-Augen-Freigabe.
+
 ## Bewusste Grenzen
 
 - **SSPR hat keine API.** Microsoft stellt keinen Endpunkt bereit, um den
@@ -133,6 +165,9 @@ keine interaktive Anmeldung.
 
 - Freigabe eines **fremden** Auftrags als Rolle `user` — dafür braucht es zwei
   echte Identitäten, also einen Mandanten.
+- Die Begrenzung der offenen Passwort-Hilfe zählt im Arbeitsspeicher. Nach
+  einem Neustart des Backends beginnt sie von vorn, und mehrere Backend-
+  Instanzen zählen getrennt.
 - Der Hybrid-Fall am echten Entra-Mandanten.
 - Der bConnect-Treiber gegen einen echten baramundi-Server; verifiziert ist er
   nur gegen `tools/bconnect-mock.js`.

@@ -46,6 +46,11 @@ services:
       DEV_ROLE: ${DEV_ROLE:-user}
       DEV_USER_ID: ${DEV_USER_ID:-a.muster@bfs.local}
       DEV_USER_NAME: ${DEV_USER_NAME:-Anna Muster}
+      # Der einfache Anmeldeweg laesst sich hier gefahrlos ausprobieren.
+      SIMPLE_LOGIN: ${SIMPLE_LOGIN:-false}
+      SIMPLE_LOGIN_SECRET: ${SIMPLE_LOGIN_SECRET:-}
+      ENTRA_IT_USERS: ${ENTRA_IT_USERS:-}
+      ENTRA_ADMIN_USERS: ${ENTRA_ADMIN_USERS:-}
     volumes:
       - staging_audit:/data
     ports:

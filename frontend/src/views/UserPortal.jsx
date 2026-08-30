@@ -14,7 +14,7 @@ export default function UserPortal() {
   const messagesEndRef = useRef(null);
 
   const [passwordData, setPasswordData] = useState({
-    newPassword: '', confirmPassword: '', loading: false, message: null, success: false
+    contact: '', note: '', loading: false, message: null, success: false
   });
   const [softwareData, setSoftwareData] = useState({ available: [], loading: false });
 
@@ -106,22 +106,24 @@ export default function UserPortal() {
     }
   };
 
-  const handlePasswordReset = async () => {
-    if (passwordData.newPassword !== passwordData.confirmPassword)
-      return setPasswordData({ ...passwordData, message: 'Passwörter stimmen nicht!', success: false });
-    if (passwordData.newPassword.length < 12)
-      return setPasswordData({ ...passwordData, message: 'Min. 12 Zeichen!', success: false });
-
-    setPasswordData({ ...passwordData, loading: true });
+  // Kein Zuruecksetzen aus dem Portal heraus. Das Portal legt eine Anfrage an,
+  // die IT prueft die Identitaet ausserhalb und loest danach reset_ad_password
+  // aus — freigegeben von einer zweiten Person.
+  const requestPasswordHelp = async () => {
+    setPasswordData({ ...passwordData, loading: true, message: null });
     try {
-      await authedFetch('/api/self-service/password-reset', {
+      const res = await authedFetch('/api/self-service/password-help', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ newPassword: passwordData.newPassword })
+        body: JSON.stringify({ contact: passwordData.contact, note: passwordData.note })
       });
-      setPasswordData({ newPassword: '', confirmPassword: '', loading: false, message: '✅ Passwort erfolgreich geändert!', success: true });
-    } catch {
-      setPasswordData({ ...passwordData, loading: false, message: 'Fehler', success: false });
+      const data = await res.json();
+      // Ohne diese Pruefung meldete die Oberflaeche auch dann Erfolg, wenn das
+      // Backend gar nichts angelegt hat.
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      setPasswordData({ contact: '', note: '', loading: false, message: data.message, success: true });
+    } catch (err) {
+      setPasswordData({ ...passwordData, loading: false, message: `Fehlgeschlagen: ${err.message}`, success: false });
     }
   };
 
@@ -136,7 +138,7 @@ export default function UserPortal() {
 
   const TABS = [
     { id: 'chat', label: '💬 Chat' },
-    { id: 'password', label: '🔐 Passwort' },
+    { id: 'password', label: '🔐 Passwort-Hilfe' },
     { id: 'software', label: '💻 Software' }
   ];
 
@@ -245,27 +247,34 @@ export default function UserPortal() {
 
         {activeTab === 'password' && (
           <div className="max-w-md space-y-4">
+            <p className="text-sm text-slate-400">
+              Passwort vergessen oder Konto gesperrt? Fordere Hilfe an. Der IT-Support prüft
+              deine Identität ausserhalb des Portals und setzt erst danach zurück — die
+              Freigabe erteilt eine zweite Person aus der IT.
+            </p>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Neues Passwort (min. 12 Zeichen)</label>
-              <input type="password" value={passwordData.newPassword}
-                onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+              <label className="block text-sm font-medium text-slate-300 mb-1">Rückruf (optional)</label>
+              <input value={passwordData.contact}
+                onChange={(e) => setPasswordData({ ...passwordData, contact: e.target.value })}
+                placeholder="Durchwahl oder Mobilnummer"
                 className="w-full px-4 py-2.5 bg-[#131a27] border border-slate-800 text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/60" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Bestätigung</label>
-              <input type="password" value={passwordData.confirmPassword}
-                onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+              <label className="block text-sm font-medium text-slate-300 mb-1">Anmerkung (optional)</label>
+              <textarea value={passwordData.note} rows={3}
+                onChange={(e) => setPasswordData({ ...passwordData, note: e.target.value })}
+                placeholder="z. B. Konto gesperrt seit heute früh"
                 className="w-full px-4 py-2.5 bg-[#131a27] border border-slate-800 text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/60" />
             </div>
             {passwordData.message && (
-              <div className={`p-3 rounded-lg flex items-center gap-2 ${passwordData.success ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/10 text-rose-300 border border-rose-500/30'}`}>
-                {passwordData.success ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
+              <div className={`p-3 rounded-lg flex items-start gap-2 text-sm ${passwordData.success ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/10 text-rose-300 border border-rose-500/30'}`}>
+                {passwordData.success ? <CheckCircle size={18} className="shrink-0 mt-0.5" /> : <AlertCircle size={18} className="shrink-0 mt-0.5" />}
                 {passwordData.message}
               </div>
             )}
-            <button onClick={handlePasswordReset} disabled={passwordData.loading}
-              className="w-full px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition-colors font-medium">
-              {passwordData.loading ? '⏳' : 'Passwort ändern'}
+            <button onClick={requestPasswordHelp} disabled={passwordData.loading}
+              className="w-full px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 text-white rounded-xl transition-colors font-medium">
+              {passwordData.loading ? '⏳' : 'Hilfe anfordern'}
             </button>
           </div>
         )}

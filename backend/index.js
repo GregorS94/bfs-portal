@@ -14,6 +14,11 @@ const agents = require('./agents');
 const { decisionProblem } = require('./approval');
 
 const app = express();
+// Genau ein Zwischenschritt (nginx). Ohne das traegt jede Anfrage die Adresse
+// des nginx-Containers und die Begrenzung der oeffentlichen Route wuerde alle
+// Absender in einen Topf werfen. Mehr als eine Ebene zu vertrauen waere falsch:
+// dann koennte der Absender seine Adresse selbst behaupten.
+app.set('trust proxy', 1);
 app.use(express.json({ limit: '1mb' }));
 app.use(cors());
 
@@ -152,6 +157,124 @@ app.post('/api/auth/login', auth.requireUser, (req, res) => {
   res.json({ user: req.user });
 });
 app.get('/api/auth/me', auth.requireUser, (req, res) => res.json({ user: req.user }));
+
+// --- Einfache Anmeldung --------------------------------------------------------
+//
+// Nur im Modus 'simple'. Der Nutzer behauptet eine Kennung, niemand prueft sie.
+// Deshalb steht im Audit-Log ausdruecklich 'ungeprueft' — sonst laesst sich das
+// spaeter nicht von einer echten Anmeldung unterscheiden.
+app.post('/api/auth/simple', (req, res) => {
+  if (auth.MODE !== 'simple') {
+    return res.status(404).json({ error: 'Dieser Anmeldeweg ist nicht aktiv.' });
+  }
+  const identity = String(req.body?.identity || '').trim();
+  if (!auth.IDENTITY.test(identity)) {
+    return res.status(400).json({ error: 'Bitte einen gültigen Anmeldenamen eingeben.' });
+  }
+  const role = auth.roleFromName(identity);
+  store.audit('auth.simple.login', { identity, role, verified: false, remote: clientKey(req) });
+  res.json({ token: auth.signSimpleToken(identity), user: { id: identity, displayName: identity, role, authenticated: false, authMode: 'simple' } });
+});
+
+// --- Passwort vergessen --------------------------------------------------------
+//
+// Diese Route ist die einzige ohne Anmeldung, die etwas anlegt — sie muss es
+// sein, denn wer sein Passwort vergessen hat, kommt nicht herein. Daraus folgen
+// drei Regeln, die hier bewusst zusammenstehen:
+//
+//   1. Die Antwort ist immer dieselbe. Sie verraet nie, ob es das Konto gibt.
+//      Sonst waere das ein Verzeichnis aller Anmeldenamen des Hauses.
+//   2. Begrenzung je Absender, sonst legt ein Skript beliebig viele Anfragen an.
+//   3. Es wird NICHTS zurueckgesetzt. Es entsteht nur ein Arbeitsvorrat fuer die
+//      IT, die die Identitaet ausserhalb des Portals prueft und danach
+//      reset_ad_password ausloest — mit Vier-Augen-Freigabe.
+
+const RATE_MAX = Number(process.env.PUBLIC_RATE_MAX || 5);
+const RATE_WINDOW_MS = Number(process.env.PUBLIC_RATE_WINDOW_MINUTES || 15) * 60 * 1000;
+const rateHits = new Map();
+
+function clientKey(req) {
+  return String(req.ip || req.socket?.remoteAddress || 'unbekannt');
+}
+
+function rateLimited(req) {
+  const key = clientKey(req);
+  const now = Date.now();
+  const hits = (rateHits.get(key) || []).filter((t) => now - t < RATE_WINDOW_MS);
+  if (hits.length >= RATE_MAX) {
+    rateHits.set(key, hits);
+    return true;
+  }
+  hits.push(now);
+  rateHits.set(key, hits);
+  return false;
+}
+
+// Immer dieselbe Auskunft, egal was passiert ist.
+const NEUTRAL = {
+  message:
+    'Danke. Wenn es zu diesem Anmeldenamen ein Konto gibt, meldet sich der IT-Support. ' +
+    'Halte bitte einen Ausweis oder deine Personalnummer bereit — die Identität wird ausserhalb des Portals geprüft.'
+};
+
+async function takePasswordRequest(req, res, source, identity) {
+  const contact = String(req.body?.contact || '').trim().slice(0, 120);
+  const note = String(req.body?.note || '').trim().slice(0, 500);
+
+  const entry = store.createPasswordRequest({ identity, contact, note, source, remote: clientKey(req) });
+  store.audit('password.help.requested', {
+    requestId: entry.id, identity, source, hasContact: Boolean(contact), remote: clientKey(req)
+  });
+
+  // Jira ist optional. Ohne Jira bleibt die Anfrage im Portal sichtbar, statt
+  // dass die Funktion ganz ausfaellt.
+  if (atlassian.jiraReady()) {
+    try {
+      const ticket = await atlassian.createTicket({
+        summary: `Passwort-Hilfe: ${identity}`,
+        description:
+          'Jemand hat über den Anmeldebildschirm um Hilfe beim Passwort gebeten. ' +
+          'Die Identität ist NICHT geprüft. Bitte ausserhalb des Portals verifizieren, ' +
+          'danach reset_ad_password auslösen (Freigabe durch eine zweite Person nötig).',
+        context: { Anmeldename: identity, Rückruf: contact, Anmerkung: note, Weg: source },
+        labels: ['passwort-hilfe']
+      });
+      store.attachTicket(entry.id, ticket);
+      store.audit('ticket.created', { key: ticket.key, by: 'passwort-hilfe', requestId: entry.id });
+    } catch (err) {
+      console.warn('Ticket für Passwort-Hilfe fehlgeschlagen:', err.message);
+    }
+  }
+  res.status(202).json(NEUTRAL);
+}
+
+app.post('/api/public/password-help', async (req, res) => {
+  const identity = String(req.body?.identity || '').trim();
+  if (!auth.IDENTITY.test(identity)) {
+    return res.status(400).json({ error: 'Bitte einen gültigen Anmeldenamen eingeben.' });
+  }
+  // Die Begrenzung antwortet ebenfalls neutral: auch "zu viele Versuche" waere
+  // ein Signal, mit dem sich Namen durchprobieren lassen.
+  if (rateLimited(req)) return res.status(202).json(NEUTRAL);
+  await takePasswordRequest(req, res, 'public', identity);
+});
+
+// Derselbe Weg aus der angemeldeten Sitzung. Hier ist die Kennung bekannt, sie
+// wird deshalb nicht aus dem Formular uebernommen.
+app.post('/api/self-service/password-help', auth.requireUser, async (req, res) => {
+  await takePasswordRequest(req, res, 'portal', req.user.id);
+});
+
+app.get('/api/password-requests', auth.requireUser, auth.requireRole('it'), (req, res) => {
+  res.json({ requests: store.listPasswordRequests() });
+});
+
+app.post('/api/password-requests/:id/close', auth.requireUser, auth.requireRole('it'), (req, res) => {
+  const entry = store.closePasswordRequest(req.params.id, req.user.id);
+  if (!entry) return res.status(404).json({ error: 'Anfrage nicht gefunden.' });
+  store.audit('password.help.closed', { requestId: entry.id, identity: entry.identity, by: req.user.id });
+  res.json({ request: entry });
+});
 
 async function allDevices() {
   const local = store.listDevices();
