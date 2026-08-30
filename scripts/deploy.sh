@@ -23,7 +23,7 @@ EXCLUDES=(
   --exclude '.git' --exclude 'node_modules' --exclude '.env'
   --exclude 'docs' --exclude 'scripts' --exclude 'README.md'
   --exclude 'AGENTS.md' --exclude '.gitignore' --exclude '.env.example'
-  --exclude '*.bak' --exclude '._*'
+  --exclude '*.bak' --exclude '._*' --exclude '.deployed-commit'
 )
 
 echo "==> Abgleich mit $HOST:$REMOTE_DIR"
@@ -40,6 +40,11 @@ fi
 
 echo "==> Kopieren"
 rsync -a --delete "${EXCLUDES[@]}" ./ "$HOST:$REMOTE_DIR/"
+
+# Merken, welcher Stand jetzt dort liegt. Ohne diese Marke koennte der
+# Drift-Check beim naechsten Mal nicht unterscheiden, ob eine Abweichung vom
+# Host stammt oder einfach eine noch nicht ausgerollte Aenderung ist.
+ssh "$HOST" "printf '%s' '$(git rev-parse HEAD)' > $REMOTE_DIR/.deployed-commit"
 
 echo "==> Container neu bauen"
 ssh "$HOST" "cd $REMOTE_DIR && docker compose up -d --build"
