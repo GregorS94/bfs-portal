@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, CheckCircle, AlertCircle, ShieldAlert, Terminal } from 'lucide-react';
+import RichText from '../markdown';
 import { authedFetch } from '../auth';
 
 // Mitarbeiter-Sicht: Chat, Passwort, Software. Keine Geräte, kein Audit.
@@ -186,7 +187,7 @@ export default function UserPortal() {
                     msg.role === 'user'
                       ? 'bg-indigo-600 text-white rounded-2xl rounded-br-md shadow-lg shadow-indigo-600/15'
                       : 'bg-[#131a27] border border-slate-800 text-slate-200 rounded-2xl rounded-bl-md'}`}>
-                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                    <RichText text={msg.content} />
                   </div>
                 </div>
               ))}
