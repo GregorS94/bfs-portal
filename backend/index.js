@@ -210,12 +210,10 @@ function rateLimited(req) {
   return false;
 }
 
-// Immer dieselbe Auskunft, egal was passiert ist.
-const NEUTRAL = {
-  message:
-    'Danke. Wenn es zu diesem Anmeldenamen ein Konto gibt, meldet sich der IT-Support. ' +
-    'Halte bitte einen Ausweis oder deine Personalnummer bereit — die Identität wird ausserhalb des Portals geprüft.'
-};
+// Immer dieselbe Auskunft, egal was passiert ist. Bewusst kurz und ohne
+// Bedingung: ein "wenn es das Konto gibt" laedt zum Ruecksschluss ein, und wie
+// die Identitaet geprueft wird, sagt die IT beim Rueckruf.
+const NEUTRAL = { message: 'Danke. Der IT-Support meldet sich bei dir.' };
 
 async function takePasswordRequest(req, res, source, identity) {
   const contact = String(req.body?.contact || '').trim().slice(0, 120);
