@@ -1,5 +1,27 @@
 # Betrieb und Fallstricke
 
+## Änderungen ausrollen
+
+**Das Repository ist die Quelle der Wahrheit, nicht der Pi.** Geändert wird
+hier, ausgerollt wird von hier — wer direkt auf dem Host editiert, verliert die
+Änderung beim nächsten Ausrollen und im Repository fehlt sie ohnehin.
+
+```bash
+scripts/check-drift.sh    # steht auf dem Host etwas, das das Repo nicht kennt?
+scripts/deploy.sh         # kopieren, Container neu bauen, Status zeigen
+git add -A && git commit && git push
+```
+
+`deploy.sh` ruft `check-drift.sh` selbst auf und bricht ab, wenn der Host
+Stände hat, die das Repository nicht kennt — sonst überschriebe das Ausrollen
+sie stillschweigend. Am Ende meldet es Commits, die noch nicht gepusht sind.
+
+Beide Skripte nehmen `DEPLOY_HOST` und `DEPLOY_DIR` aus der Umgebung; ohne
+Angabe gilt `steppat@pihole:~/bfs-portal`.
+
+Die `.env` bleibt vom Ausrollen ausgenommen und liegt nur auf dem Host — sie
+enthält die Zugangsdaten und gehört nicht ins Repository.
+
 ## Tests
 
 Alle Treibertests laufen gegen Attrappen in `tools/`, die die Request-Formen

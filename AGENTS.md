@@ -35,6 +35,14 @@ Code sind englisch. Das bleibt so.
 
 ## Nach dem Ändern
 
+**Ausrollen und pushen gehören zusammen.** Eine Änderung, die auf dem Host
+läuft, aber nicht im Repository steht, ist nach dem nächsten Ausrollen weg:
+
+```bash
+scripts/deploy.sh
+git add -A && git commit && git push
+```
+
 ```bash
 node tools/actions-test.js && node tools/atlassian-test.js \
   && node tools/entra-test.js && node tools/settings-test.js
