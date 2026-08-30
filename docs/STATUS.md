@@ -23,6 +23,19 @@ sofort mit echten Gerätedaten.
 Ende zu Ende geprüft: Klick im UI → Exit 0 → das Journal auf dem Zielgerät
 schrumpfte von 9,4 MB auf 8,0 MB.
 
+**Passwort vergessen, ohne Anmeldung.** Am laufenden System durchgespielt:
+Zwölf Anfragen von derselben Adresse ergaben genau fünf Einträge, alle zwölf
+Antworten waren wortgleich — die Begrenzung greift, ohne sich zu verraten. Ein
+formal ungültiger Anmeldename liefert 400, ein gültiger immer 202. Die IT sieht
+den Arbeitsvorrat unter `/it`, „Erledigt" schreibt `password.help.closed` mit
+der freigebenden Person ins Audit-Log. Zurückgesetzt wird dabei nichts.
+
+**Zweiter Anmeldeweg (`simple`).** Geprüft: ohne Token 401, mit gültigem Token
+die eigene Kennung, nach einem geänderten Zeichen im Token 401, Rolle `user`
+bekommt auf der IT-Route 403 und eine Kennung aus `ENTRA_IT_USERS` die Rolle
+`it`. Das Audit-Log führt `auth.simple.login` mit `verified: false`, die
+Seitenleiste zeigt dauerhaft „Testbetrieb — Identität ungeprüft".
+
 **Absicherung.** Zwei unabhängige Ebenen, im Test abgewiesen wurden `bash -c`,
 `curl`, `systemctl mask` und ein Argument mit `;`. Details in
 [`SECURITY.md`](SECURITY.md).
@@ -69,8 +82,13 @@ Seitenkörper nachgeladen und aus dem XHTML Fließtext gemacht.
 ## Offen
 
 1. **Zwei Entra-IDs** eines echten Mandanten — dann ist die Anmeldung scharf.
-2. **Passwort/Konten: die IT-Ansicht fehlt.** Backend steht (Kontostatus,
-   Entsperren, Zurücksetzen), die Oberfläche dazu noch nicht.
+2. **AD-Aktionen sind weiterhin nicht auslösbar.** `reset_ad_password`,
+   `unlock_ad_account` und `get_ad_account_status` sind definiert, geprüft und
+   mit Vier-Augen belegt — aber `createJob()` wird nur aus dem Chat heraus
+   aufgerufen, und dort sind sie mit `chat: false` ausgeschlossen. Die
+   Passwort-Hilfe legt jetzt den Arbeitsvorrat an; was fehlt, ist der Knopf im
+   IT-Bereich, der aus einer Anfrage den Auftrag macht. Erst damit läuft die
+   Vier-Augen-Freigabe im laufenden Portal statt nur im Test.
 3. **bConnect am echten Server prüfen.** Verifiziert ist nur gegen die
    Attrappe. Offen sind die Feldnamen der JobInstance-Zustände
    (`interpretState()`) und ob ein bMS-Job Rohausgabe liefert oder nur Status.
