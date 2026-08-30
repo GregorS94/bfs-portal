@@ -8,6 +8,13 @@
 #
 #   scripts/deploy.sh              # ausrollen und neu bauen
 #   DEPLOY_HOST=user@host scripts/deploy.sh
+#   DEPLOY_ACCEPT_HOST=1 scripts/deploy.sh   # gemeldete Abweichung ueberschreiben
+#
+# Ausgerollt wird der eingecheckte Stand. Ein schmutziges Arbeitsverzeichnis
+# bricht ab: die Marke .deployed-commit nennt sonst einen Commit, der nicht dem
+# entspricht, was tatsaechlich auf dem Host liegt — und der naechste Drift-Check
+# haelt die eigene Aenderung fuer eine Manipulation am Host. Genau das ist am
+# 30.08.2026 passiert.
 #
 set -euo pipefail
 
@@ -26,16 +33,24 @@ EXCLUDES=(
   --exclude '*.bak' --exclude '._*' --exclude '.deployed-commit'
 )
 
-echo "==> Abgleich mit $HOST:$REMOTE_DIR"
-"$REPO_ROOT/scripts/check-drift.sh" || {
-  echo
-  echo "Auf dem Host stehen Änderungen, die das Repository nicht kennt."
-  echo "Erst übernehmen oder verwerfen, sonst gehen sie verloren."
-  exit 1
-}
-
 if [[ -n "$(git status --porcelain)" ]]; then
-  echo "Hinweis: nicht eingecheckte Änderungen im Arbeitsverzeichnis."
+  echo "Nicht eingecheckte Änderungen im Arbeitsverzeichnis."
+  echo "Erst committen — sonst liegt auf dem Host ein Stand, den kein Commit beschreibt."
+  git status --short
+  exit 1
+fi
+
+echo "==> Abgleich mit $HOST:$REMOTE_DIR"
+if [[ "${DEPLOY_ACCEPT_HOST:-0}" == "1" ]]; then
+  echo "DEPLOY_ACCEPT_HOST=1 — Abweichung auf dem Host wird überschrieben."
+else
+  "$REPO_ROOT/scripts/check-drift.sh" || {
+    echo
+    echo "Auf dem Host stehen Änderungen, die das Repository nicht kennt."
+    echo "Erst ansehen und übernehmen oder verwerfen, sonst gehen sie verloren."
+    echo "Wenn sie nachweislich egal sind: DEPLOY_ACCEPT_HOST=1 scripts/deploy.sh"
+    exit 1
+  }
 fi
 
 echo "==> Kopieren"
