@@ -10,29 +10,56 @@ Oberfläche — jeder Schritt im Audit-Log.
 > Ziel. Was verifiziert ist und was noch offen ist, steht in
 > [`docs/STATUS.md`](docs/STATUS.md).
 
-![Chat-Oberfläche für Mitarbeitende](docs/screenshots/chat.png)
+![Eine verändernde Aktion wartet auf Freigabe und läuft erst nach dem Klick](docs/demo/freigabe.gif)
 
-## Zwei Minuten zusehen
+<sub>Der ganze Kern in sieben Sekunden: Das Modell schlägt vor, ein Mensch gibt
+frei, erst dann passiert etwas auf dem Gerät.</sub>
 
-[**Aufzeichnung eines Durchlaufs**](docs/demo/bfs-portal-demo.mp4) (2:06, ohne
-Ton) — GitHub spielt die Datei direkt im Browser ab. Keine Folien: Das Skript
-bedient die laufende Instanz und wartet auf echte Antworten des Modells,
-eingeblendete Texte erklären den jeweiligen Schritt.
+## Sechs Bilder, die das Portal erklären
 
-1. **Diagnose** — „Wie voll ist meine Festplatte?" Das Modell ruft
-   `get_disk_space` auf dem Gerät auf und antwortet mit gemessenen Werten.
-2. **Freigabe** — die Bereinigung der Journal-Logs erzeugt einen Auftrag im
-   Zustand `awaiting_approval` und bleibt liegen, bis ein Mensch klickt.
-3. **Nachschlagen** — eine Frage zur Druckereinrichtung wird aus dem
-   Confluence-Seitentext beantwortet, samt Servername aus der Anleitung.
-4. **Eskalation** — ein Hardwareschaden lässt sich nicht per Software lösen,
-   also legt das Modell selbst ein Jira-Ticket an.
-5. **IT-Sicht** — Auftragsverlauf mit Freigebendem, dazu das Audit-Log.
-6. **Betrieb** — Dienste-Status und die Seite für die Zugangsdaten.
+Alle Aufnahmen stammen aus der laufenden Instanz, jede aus einem eigenen
+Gespräch. Wer lieber zusieht: [**Aufzeichnung eines Durchlaufs**](docs/demo/bfs-portal-demo.mp4),
+2:06, ohne Ton.
 
-> In der Aufzeichnung laufen Confluence und Jira gegen eine Attrappe
+**1 — Das Modell sieht selbst nach.** „Wie voll ist meine Festplatte?" führt zu
+einem Aufruf von `get_disk_space` auf dem Gerät. Die Zahlen sind gemessen, nicht
+geschätzt; der graue Balken unter der Antwort zeigt, welche Aktion gelaufen ist.
+
+![Diagnose: das Modell ruft get_disk_space auf dem Gerät auf](docs/screenshots/01-diagnose.png)
+
+**2 — Verändernde Aktionen warten.** Die Bereinigung der Journal-Logs erzeugt
+einen Auftrag im Zustand `awaiting_approval`. Der Befehl steht fest im Backend,
+das Modell formuliert ihn nicht. Ohne Klick passiert nichts — und das Modell
+sagt hier von sich aus, dass die Bereinigung gar nicht nötig ist.
+
+![Freigabe erforderlich: clear_journal_logs wartet auf Bestätigung](docs/screenshots/02-freigabe.png)
+
+**3 — Antworten statt Suchergebnisse.** Das Modell durchsucht Confluence, lädt
+den Seitentext der besten Treffer nach und antwortet daraus — inklusive
+Druckserver-Name aus der Anleitung.
+
+![Wissensdatenbank: Antwort aus dem Confluence-Seitentext](docs/screenshots/03-wissen.png)
+
+**4 — Wenn Software nicht hilft, entsteht ein Ticket.** Ein gebrochenes
+Scharnier lässt sich nicht aus der Ferne reparieren. Statt zu raten, sucht das
+Modell erst nach, legt dann selbst einen Jira-Vorgang an und nennt die Nummer.
+
+![Eskalation: das Modell legt Ticket ITS-101 in Jira an](docs/screenshots/04-ticket.png)
+
+**5 — Die Sicht des IT-Supports.** Offene Freigaben oben, darunter der Verlauf
+aller Aufträge mit Gerät, Zeit und der Person, die freigegeben hat.
+
+![IT-Support: offene Freigabe und Auftragsverlauf](docs/screenshots/05-auftraege.png)
+
+**6 — Das Audit-Log.** Vom Backend geschrieben, nie vom Modell. Die Einträge
+sind über Hashes verkettet: Wer nachträglich etwas ändert, bricht die Kette.
+
+![Audit-Log: verkettete Einträge über Aufträge, Freigaben und Tickets](docs/screenshots/06-audit.png)
+
+> In den Bildern 3 und 4 laufen Confluence und Jira gegen eine Attrappe
 > (`tools/atlassian-mock.js`) — daher die Adresse `192.168.178.50:4600` in der
-> Administrationsseite. Modell, Geräte-Agent, Freigabe und Audit-Log sind echt.
+> Administrationsseite weiter unten. Eine echte Atlassian-Instanz ist noch nicht
+> angebunden. Modell, Geräte-Agent, Freigabe und Audit-Log sind echt.
 
 ## Die Idee
 
@@ -109,7 +136,7 @@ zweite Person aus der IT freigeben muss. Die Antwort des offenen Endpunkts ist
 immer dieselbe, auch bei unbekanntem Konto; sonst wäre er ein Verzeichnis
 aller Anmeldenamen des Hauses.
 
-![Administration: Dienste-Status und Zugangsdaten](docs/screenshots/administration.png)
+![Administration: Dienste-Status und Zugangsdaten](docs/screenshots/07-administration.png)
 
 Die Statusseite prüft alle Abhängigkeiten und aktualisiert sich alle 15
 Sekunden. Zugangsdaten werden hier eingetragen statt in der `.env` —
