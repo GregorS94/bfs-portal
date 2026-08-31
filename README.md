@@ -84,6 +84,11 @@ BaFin-Aufsicht, damit hängen Auslagerungsmanagement, Vorfallmeldung,
 Aufbewahrungsfristen und Mitbestimmung an einer produktiven Einführung.
 Aufstellung samt Lückenliste in [`docs/PROZESSE.md`](docs/PROZESSE.md).
 
+Die ersten drei Punkte hängen alle am selben Nagel: Der Prüfstand ist ein
+privater Raspberry Pi ohne Zugang zu Testsystemen des Hauses. Was eine
+Testumgebung enthalten müsste, steht in
+[`docs/SPIELWIESE.md`](docs/SPIELWIESE.md).
+
 ## Die Idee
 
 Klassischer 1st-Level-Support besteht zu großen Teilen aus immer denselben
@@ -178,6 +183,7 @@ ob etwas gesetzt ist.
 | [`docs/OPERATIONS.md`](docs/OPERATIONS.md) | Tests, Attrappen, Statusprüfung, bekannte Fallstricke |
 | [`docs/ENTRA_SETUP.md`](docs/ENTRA_SETUP.md) | App-Registrierung in Entra ID |
 | [`docs/PROZESSE.md`](docs/PROZESSE.md) | Prozesse und aufsichtsrechtliche Einordnung (DORA, MaRisk, DSGVO, AI Act) |
+| [`docs/SPIELWIESE.md`](docs/SPIELWIESE.md) | Was eine Testumgebung enthalten müsste — zum Weitergeben |
 | [`docs/STATUS.md`](docs/STATUS.md) | Was verifiziert ist, was offen ist |
 
 ## Tests
