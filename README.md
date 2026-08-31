@@ -12,6 +12,28 @@ Oberfläche — jeder Schritt im Audit-Log.
 
 ![Chat-Oberfläche für Mitarbeitende](docs/screenshots/chat.png)
 
+## Zwei Minuten zusehen
+
+[**Aufzeichnung eines Durchlaufs**](docs/demo/bfs-portal-demo.mp4) (2:06, ohne
+Ton) — GitHub spielt die Datei direkt im Browser ab. Keine Folien: Das Skript
+bedient die laufende Instanz und wartet auf echte Antworten des Modells,
+eingeblendete Texte erklären den jeweiligen Schritt.
+
+1. **Diagnose** — „Wie voll ist meine Festplatte?" Das Modell ruft
+   `get_disk_space` auf dem Gerät auf und antwortet mit gemessenen Werten.
+2. **Freigabe** — die Bereinigung der Journal-Logs erzeugt einen Auftrag im
+   Zustand `awaiting_approval` und bleibt liegen, bis ein Mensch klickt.
+3. **Nachschlagen** — eine Frage zur Druckereinrichtung wird aus dem
+   Confluence-Seitentext beantwortet, samt Servername aus der Anleitung.
+4. **Eskalation** — ein Hardwareschaden lässt sich nicht per Software lösen,
+   also legt das Modell selbst ein Jira-Ticket an.
+5. **IT-Sicht** — Auftragsverlauf mit Freigebendem, dazu das Audit-Log.
+6. **Betrieb** — Dienste-Status und die Seite für die Zugangsdaten.
+
+> In der Aufzeichnung laufen Confluence und Jira gegen eine Attrappe
+> (`tools/atlassian-mock.js`) — daher die Adresse `192.168.178.50:4600` in der
+> Administrationsseite. Modell, Geräte-Agent, Freigabe und Audit-Log sind echt.
+
 ## Die Idee
 
 Klassischer 1st-Level-Support besteht zu großen Teilen aus immer denselben
