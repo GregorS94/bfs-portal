@@ -61,6 +61,29 @@ sind über Hashes verkettet: Wer nachträglich etwas ändert, bricht die Kette.
 > Administrationsseite weiter unten. Eine echte Atlassian-Instanz ist noch nicht
 > angebunden. Modell, Geräte-Agent, Freigabe und Audit-Log sind echt.
 
+## Was die Bilder nicht zeigen
+
+Oben steht der Weg, der funktioniert. Damit niemand den Prototyp für weiter
+hält, als er ist — die vier Punkte, die zwischen „sieht gut aus" und „darüber
+kann man entscheiden" liegen. Vollständig in [`docs/STATUS.md`](docs/STATUS.md).
+
+- **Die Vier-Augen-Freigabe läuft nur im Test.** `reset_ad_password` und
+  `unlock_ad_account` sind definiert, geprüft und mit Vier-Augen belegt — aber
+  im Portal fehlt der Knopf, der aus einer Passwort-Anfrage einen Auftrag
+  macht. Genau diese Kontrolle will eine Prüfung sehen.
+- **Kein Zielsystem ist echt angebunden.** Entra, Jira, Confluence und
+  baramundi bConnect sind Attrappen. Was am echten Server anders heisst, weiss
+  bisher niemand.
+- **Aufträge und Geräte liegen im Arbeitsspeicher** und sind nach einem
+  Neustart des Backends weg. Nur das Audit-Log überlebt.
+- **Die Windows-Varianten der Aktionen sind nie auf Windows gelaufen.**
+  Getestet ist Linux, weil der Prüfstand ein Raspberry Pi ist.
+
+Der längere Weg ist ohnehin nicht die Technik: BFS Abrechnung steht unter
+BaFin-Aufsicht, damit hängen Auslagerungsmanagement, Vorfallmeldung,
+Aufbewahrungsfristen und Mitbestimmung an einer produktiven Einführung.
+Aufstellung samt Lückenliste in [`docs/PROZESSE.md`](docs/PROZESSE.md).
+
 ## Die Idee
 
 Klassischer 1st-Level-Support besteht zu großen Teilen aus immer denselben
