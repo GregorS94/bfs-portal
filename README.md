@@ -38,13 +38,13 @@ sagt hier von sich aus, dass die Bereinigung gar nicht nötig ist.
 den Seitentext der besten Treffer nach und antwortet daraus — inklusive
 Druckserver-Name aus der Anleitung.
 
-![Wissensdatenbank: Antwort aus dem Confluence-Seitentext](docs/screenshots/03-wissen.png)
+*(Bild folgt, sobald Confluence wieder angebunden ist — die vorhandene Aufnahme zeigt das alte Erscheinungsbild.)*
 
 **4 — Wenn Software nicht hilft, entsteht ein Ticket.** Ein gebrochenes
 Scharnier lässt sich nicht aus der Ferne reparieren. Statt zu raten, sucht das
 Modell erst nach, legt dann selbst einen Jira-Vorgang an und nennt die Nummer.
 
-![Eskalation: das Modell legt Ticket ITS-101 in Jira an](docs/screenshots/04-ticket.png)
+*(Bild folgt, sobald Jira wieder angebunden ist.)*
 
 **5 — Die Sicht des IT-Supports.** Offene Freigaben oben, darunter der Verlauf
 aller Aufträge mit Gerät, Zeit und der Person, die freigegeben hat.
