@@ -11,10 +11,10 @@ function inline(text, keyPrefix) {
   return text.split(INLINE).filter(Boolean).map((part, i) => {
     const key = `${keyPrefix}-${i}`;
     if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
-      return <strong key={key} className="font-semibold text-white">{part.slice(2, -2)}</strong>;
+      return <strong key={key} className="font-semibold text-tinte">{part.slice(2, -2)}</strong>;
     }
     if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
-      return <code key={key} className="font-mono text-[0.9em] px-1 py-0.5 rounded bg-slate-800/80 text-slate-100">{part.slice(1, -1)}</code>;
+      return <code key={key} className="font-mono text-[0.9em] px-1 py-0.5 rounded bg-flaeche text-tinte">{part.slice(1, -1)}</code>;
     }
     return <React.Fragment key={key}>{part}</React.Fragment>;
   });

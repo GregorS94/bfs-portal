@@ -91,8 +91,8 @@ export default function SettingsPanel() {
     }
   };
 
-  if (!data) return <div className="text-slate-500 text-sm">Einstellungen werden geladen…</div>;
-  if (data.error) return <div className="text-rose-300 text-sm">Einstellungen konnten nicht geladen werden.</div>;
+  if (!data) return <div className="text-leise text-sm">Einstellungen werden geladen…</div>;
+  if (data.error) return <div className="text-[#a32020] text-sm">Einstellungen konnten nicht geladen werden.</div>;
 
   return (
     <div className="space-y-4">
@@ -103,34 +103,34 @@ export default function SettingsPanel() {
         const res = result[group];
 
         return (
-          <section key={group} className="bg-[#131a27] border border-slate-800 rounded-xl p-5">
+          <section key={group} className="bg-white border border-linie rounded p-5">
             <div className="flex items-center gap-3 mb-1">
-              <h3 className="font-semibold text-slate-100">{title}</h3>
+              <h3 className="font-semibold text-tinte">{title}</h3>
               <span className={`text-xs px-2 py-0.5 rounded-full ${ready
-                ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30'
-                : 'bg-slate-700/40 text-slate-400 border border-slate-700'}`}>
+                ? 'bg-[#e9f5ec] text-[#1f6b39] border border-[#b7dcc1]'
+                : 'bg-flaeche text-gedimmt border border-[#d8d4cd]'}`}>
                 {ready ? 'verbunden' : 'unvollständig'}
               </span>
             </div>
-            <p className="text-xs text-slate-500 mb-4 leading-relaxed">{hint}</p>
+            <p className="text-xs text-leise mb-4 leading-relaxed">{hint}</p>
 
             <div className="grid gap-3 sm:grid-cols-2">
               {Object.entries(view.fields).map(([key, field]) => (
                 <label key={key} className="block">
-                  <span className="block text-xs text-slate-400 mb-1">{field.label}</span>
+                  <span className="block text-xs text-gedimmt mb-1">{field.label}</span>
                   <input
                     type="text"
                     defaultValue={field.value}
                     onChange={e => setDraft(group, key, e.target.value)}
-                    className="w-full px-3 py-2 bg-[#0b0f16] border border-slate-800 rounded-lg
-                               text-slate-100 text-sm focus:border-indigo-500 focus:outline-none"
+                    className="w-full px-3 py-2 bg-flaeche border border-linie rounded
+                               text-tinte text-sm focus:border-indigo-500 focus:outline-none"
                   />
                 </label>
               ))}
 
               {Object.entries(view.secrets).map(([key, secret]) => (
                 <label key={key} className="block">
-                  <span className="block text-xs text-slate-400 mb-1">
+                  <span className="block text-xs text-gedimmt mb-1">
                     {secret.label}
                     {secret.set && (
                       <>
@@ -138,7 +138,7 @@ export default function SettingsPanel() {
                         <button
                           type="button"
                           onClick={() => clearSecret(group, key)}
-                          className="ml-2 text-slate-500 hover:text-rose-300 underline"
+                          className="ml-2 text-leise hover:text-[#a32020] underline"
                         >
                           entfernen
                         </button>
@@ -150,8 +150,8 @@ export default function SettingsPanel() {
                     autoComplete="new-password"
                     placeholder={secret.set ? 'unverändert lassen' : 'noch nicht hinterlegt'}
                     onChange={e => setDraft(group, key, e.target.value)}
-                    className="w-full px-3 py-2 bg-[#0b0f16] border border-slate-800 rounded-lg
-                               text-slate-100 text-sm focus:border-indigo-500 focus:outline-none"
+                    className="w-full px-3 py-2 bg-flaeche border border-linie rounded
+                               text-tinte text-sm focus:border-indigo-500 focus:outline-none"
                   />
                 </label>
               ))}
@@ -161,8 +161,8 @@ export default function SettingsPanel() {
               <button
                 onClick={() => save(group)}
                 disabled={busy.startsWith('save')}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50
-                           text-white rounded-xl text-sm flex items-center gap-2 transition-colors"
+                className="px-4 py-2 bg-akzent hover:bg-akzent-hell disabled:opacity-50
+                           text-white rounded text-sm flex items-center gap-2 transition-colors"
               >
                 {busy === `save:${group}` ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
                 Speichern
@@ -170,15 +170,15 @@ export default function SettingsPanel() {
               <button
                 onClick={() => test(group)}
                 disabled={busy.startsWith('test')}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50
-                           text-slate-200 rounded-xl text-sm flex items-center gap-2 transition-colors"
+                className="px-4 py-2 bg-flaeche hover:bg-[#ddd8d1] disabled:opacity-50
+                           text-tinte rounded text-sm flex items-center gap-2 transition-colors"
               >
                 {busy === `test:${group}` ? <Loader2 size={15} className="animate-spin" /> : <PlugZap size={15} />}
                 Verbindung prüfen
               </button>
 
               {res && (
-                <span className={`text-sm flex items-center gap-1.5 ${res.ok ? 'text-emerald-300' : 'text-rose-300'}`}>
+                <span className={`text-sm flex items-center gap-1.5 ${res.ok ? 'text-[#1f6b39]' : 'text-[#a32020]'}`}>
                   {res.ok ? <Check size={15} /> : <X size={15} />} {res.detail}
                 </span>
               )}

@@ -5,6 +5,7 @@ import UserPortal from './views/UserPortal';
 import ITArea from './views/ITArea';
 import AdminArea from './views/AdminArea';
 import LoginScreen from './views/LoginScreen';
+import Wortmarke from './Wortmarke';
 
 // Drei getrennte Bereiche unter eigenen Adressen. Kein Router als Abhängigkeit —
 // nginx liefert für jeden Pfad dieselbe index.html, den Rest macht history.pushState.
@@ -84,41 +85,38 @@ export default function App() {
   const Body = area.component;
 
   return (
-    <div className="flex h-screen bg-[#0b0f16]">
-      <div className="w-64 bg-[#0e1420] border-r border-slate-800 text-slate-100 flex flex-col">
-        <div className="p-5 border-b border-slate-800">
-          <div className="flex items-center gap-2.5 mb-3">
-            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-base">🐝</div>
-            <h2 className="font-semibold">BFS Support</h2>
-          </div>
-          <p className="text-xs text-slate-400 truncate">{user?.displayName}</p>
+    <div className="flex h-screen bg-flaeche">
+      <div className="w-64 bg-white border-r border-linie text-tinte flex flex-col">
+        <div className="p-5 border-b border-linie">
+          <Wortmarke klein className="mb-4" />
+          <p className="text-xs text-gedimmt truncate">{user?.displayName}</p>
           <span className={`inline-block mt-2 px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider ring-1 ${
-            user?.role === 'admin' ? 'bg-fuchsia-500/15 text-fuchsia-300 ring-fuchsia-500/30'
-              : user?.role === 'it' ? 'bg-indigo-500/15 text-indigo-300 ring-indigo-500/30'
-              : 'bg-slate-700/40 text-slate-300 ring-slate-600/40'
+            user?.role === 'admin' ? 'bg-[#f3e8f7] text-[#7b3f8f] ring-[#e0c6e8]'
+              : user?.role === 'it' ? 'bg-akzent-zart text-[#a04c00] ring-akzent-rand'
+              : 'bg-flaeche text-gedimmt ring-linie'
           }`}>
             {ROLE_LABEL[user?.role] || user?.role}
           </span>
           {user?.authMode === 'simple' && (
             // Muss sichtbar bleiben: sonst sieht der einfache Weg im Betrieb
             // genauso aus wie eine geprüfte Anmeldung.
-            <p className="mt-2 text-[10px] leading-snug text-amber-300/90">
+            <p className="mt-2 text-[10px] leading-snug text-[#8a5200]">
               Testbetrieb — Identität ungeprüft
             </p>
           )}
         </div>
 
         <nav className="flex-1 p-3 space-y-1">
-          <p className="text-[10px] uppercase tracking-wide text-slate-500 px-2 pb-1">Bereiche</p>
+          <p className="text-[10px] uppercase tracking-wide text-leise px-2 pb-1">Bereiche</p>
           {visibleAreas.map(a => {
             const Icon = a.icon;
             return (
               <button key={a.path} onClick={() => go(a.path)}
-                className={`w-full text-left px-3 py-2.5 min-h-[46px] rounded-xl flex items-center gap-2.5 transition-all relative ${
+                className={`w-full text-left px-3 py-2.5 min-h-[46px] rounded flex items-center gap-2.5 transition-all relative ${
                   area.path === a.path
-                    ? 'bg-indigo-500/12 text-indigo-200 ring-1 ring-indigo-500/25'
-                    : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'}`}>
-                {area.path === a.path && <span className="absolute left-0 top-2.5 bottom-2.5 w-0.5 rounded-full bg-indigo-400" />}
+                    ? 'bg-akzent-zart text-[#a04c00] ring-1 ring-akzent-rand'
+                    : 'text-gedimmt hover:bg-flaeche hover:text-tinte'}`}>
+                {area.path === a.path && <span className="absolute left-0 top-2.5 bottom-2.5 w-0.5 rounded-full bg-akzent" />}
                 <Icon size={16} className="flex-shrink-0" />
                 <span>
                   <span className="block text-sm font-medium">{a.name}</span>
@@ -129,28 +127,28 @@ export default function App() {
           })}
         </nav>
 
-        <div className="p-3 border-t border-slate-800">
+        <div className="p-3 border-t border-linie">
           <button onClick={() => (authMode() === 'off' ? setAuthenticated(false) : signOut())}
-            className="w-full flex items-center gap-2 px-3 py-2 text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 rounded-xl text-sm transition-colors">
+            className="w-full flex items-center gap-2 px-3 py-2 text-gedimmt hover:bg-flaeche hover:text-tinte rounded text-sm transition-colors">
             <LogOut size={16} /> Abmelden
           </button>
         </div>
       </div>
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="bg-[#0e1420]/80 border-b border-slate-800 px-6 h-[68px] flex flex-col justify-center backdrop-blur">
-          <h1 className="font-semibold text-slate-100">{area.name}</h1>
-          {area.subtitle && <p className="text-xs text-slate-500">{area.subtitle}</p>}
+        <div className="bg-white/80 border-b border-linie px-6 h-[68px] flex flex-col justify-center backdrop-blur">
+          <h1 className="font-semibold text-tinte">{area.name}</h1>
+          {area.subtitle && <p className="text-xs text-leise">{area.subtitle}</p>}
         </div>
 
         {allowed ? <Body user={user} /> : (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <p className="text-lg font-bold text-slate-100 mb-1">Kein Zugriff</p>
-              <p className="text-sm text-slate-500 mb-4">
+              <p className="text-lg font-bold text-tinte mb-1">Kein Zugriff</p>
+              <p className="text-sm text-leise mb-4">
                 Dieser Bereich ist der Rolle „{ROLE_LABEL[area.min]}" vorbehalten. Du bist „{ROLE_LABEL[user?.role]}".
               </p>
-              <button onClick={() => go('/')} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm">
+              <button onClick={() => go('/')} className="px-4 py-2 bg-akzent hover:bg-akzent-hell text-white rounded text-sm">
                 Zum Mitarbeiter-Portal
               </button>
             </div>
