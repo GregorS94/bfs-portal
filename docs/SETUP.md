@@ -10,6 +10,53 @@
 Entwickelt und betrieben auf einem Raspberry Pi 5 (8 GB). Die Images bauen
 unter arm64 und amd64 gleichermaßen.
 
+## Docker-Adressbereiche — vor dem ersten Start
+
+**Das ist keine Feinheit, sondern eine Voraussetzung.** Docker vergibt seinen
+Containern ab Werk Adressen aus `172.17.0.0/12`, in Blöcken von je einem /16.
+Das BFS-Clientnetz liegt auf `172.18.38.0/23` — und das steckt vollständig im
+zweiten Block, den Docker vergibt.
+
+Passiert das, hält jeder Container `172.18.38.x` für seinen eigenen Nachbarn
+und legt die Pakete auf die Bridge, statt sie zum Router zu geben. Ein Client
+im BFS-Netz ist dann aus dem Container **lautlos unerreichbar**: kein Fehler,
+keine Meldung, nur Zeitüberschreitungen an unerwarteter Stelle.
+
+Ist der erste Vorrat erschöpft, greift Docker auf `192.168.0.0/16` zurück —
+womit dasselbe Spiel in Heim- und Zweigstellennetzen von vorn beginnt.
+
+Deshalb **vor dem ersten `docker compose up`** in `/etc/docker/daemon.json`:
+
+```json
+{
+  "default-address-pools": [
+    { "base": "10.180.0.0/16", "size": 24 }
+  ],
+  "bip": "10.181.0.1/24"
+}
+```
+
+Danach `systemctl restart docker`. Das ergibt 256 Netze zu je 254 Adressen —
+pro Compose-Stack eins, mehr als genug.
+
+**Nachträglich reicht das nicht.** Bestehende Netze behalten ihr Subnetz; sie
+ziehen erst um, wenn der Stack einmal komplett neu erzeugt wird (`down` und
+`up`, nicht `restart`). Deshalb gehört dieser Schritt vor die Installation und
+nicht in die Fehlersuche.
+
+**Die Zahlen sind für BFS zu prüfen.** `10.180.0.0/16` ist gegen die bekannten
+Bereiche geprüft — Clients `172.18.38.0/23`, Standorte `10.11.x` und `10.21.x`,
+Azure-VNet `10.0.0.0/16`, AKS-Vorgaben `10.244.0.0/16` und `10.0.0.0/16`, dazu
+die Kubernetes-Vorgaben `10.42`, `10.43`, `10.96`. Vor dem Einsatz trotzdem
+gegenzeichnen lassen:
+
+```bash
+az network vnet list -o table \
+  --query "[].{Name:name, RG:resourceGroup, Space:addressSpace.addressPrefixes}"
+az aks show -g <gruppe> -n <cluster> \
+  --query "networkProfile.{Service:serviceCidr, Pod:podCidr, Plugin:networkPlugin}"
+```
+
 ## Portal starten
 
 ```bash
