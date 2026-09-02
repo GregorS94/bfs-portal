@@ -91,7 +91,9 @@ export default function App() {
           <Wortmarke klein className="mb-4" />
           <p className="text-xs text-gedimmt truncate">{user?.displayName}</p>
           <span className={`inline-block mt-2 px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider ring-1 ${
-            user?.role === 'admin' ? 'bg-[#f3e8f7] text-[#7b3f8f] ring-[#e0c6e8]'
+            // Kein zweiter Farbton neben Orange — die Rolle unterscheidet sich
+            // über die Sättigung, nicht über eine neue Farbe.
+            user?.role === 'admin' ? 'bg-akzent text-white ring-akzent'
               : user?.role === 'it' ? 'bg-akzent-zart text-[#a04c00] ring-akzent-rand'
               : 'bg-flaeche text-gedimmt ring-linie'
           }`}>
