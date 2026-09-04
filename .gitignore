@@ -12,6 +12,11 @@ node_modules/
 dist/
 build/
 
+# Rust-Baustand des Desktop-Programms. Cargo.lock gehoert bewusst NICHT
+# hierher: bei einem Programm (im Gegensatz zu einer Bibliothek) legt sie die
+# genauen Versionen fest, und genau das will man in einem beaufsichtigten Haus.
+desktop/src-tauri/target/
+
 *.bak
 *.log
 .DS_Store

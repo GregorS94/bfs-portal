@@ -21,6 +21,50 @@ import time
 import urllib.error
 import urllib.request
 
+def _konfigdatei():
+    """Die Datei mit PORTAL_URL und AGENT_TOKEN.
+
+    Unter Linux liest systemd sie als EnvironmentFile ein, bevor der Agent
+    startet. Unter Windows gibt es dafür kein Gegenstück: Ein Dienst erbt keine
+    Umgebung, und der Token in eine systemweite Umgebungsvariable zu schreiben
+    hiesse, ihn jedem angemeldeten Benutzer zu zeigen. Also liest der Agent die
+    Datei dort selbst.
+    """
+    if platform.system() == "Windows":
+        basis = os.environ.get("ProgramData", r"C:\ProgramData")
+        return os.path.join(basis, "BFS", "bfs-agent.env")
+    return "/etc/bfs-agent.env"
+
+
+def lade_konfigdatei(pfad=None):
+    """Setzt KEY=VALUE-Zeilen als Umgebungsvariablen — aber überschreibt nichts.
+
+    Was schon in der Umgebung steht, gewinnt. Sonst könnte eine vergessene
+    Datei auf der Platte eine bewusst gesetzte Variable aushebeln.
+    """
+    pfad = pfad or os.environ.get("AGENT_ENV_FILE") or _konfigdatei()
+    try:
+        with open(pfad, "r", encoding="utf-8") as fh:
+            zeilen = fh.readlines()
+    except OSError:
+        return {}
+
+    gesetzt = {}
+    for zeile in zeilen:
+        zeile = zeile.strip()
+        if not zeile or zeile.startswith("#") or "=" not in zeile:
+            continue
+        schluessel, _, wert = zeile.partition("=")
+        schluessel = schluessel.strip()
+        wert = wert.strip().strip('"').strip("'")
+        if schluessel and schluessel not in os.environ:
+            os.environ[schluessel] = wert
+            gesetzt[schluessel] = wert
+    return gesetzt
+
+
+lade_konfigdatei()
+
 PORTAL_URL = os.environ.get("PORTAL_URL", "http://127.0.0.1:9001")
 DEVICE_ID = os.environ.get("DEVICE_ID") or socket.gethostname()
 POLL_TIMEOUT = 40  # muss über dem Long-Poll-Fenster des Servers liegen
@@ -29,7 +73,23 @@ POLL_TIMEOUT = 40  # muss über dem Long-Poll-Fenster des Servers liegen
 # Danach hat dieses Gerät ein eigenes Token, das nur für es selbst gilt und im
 # Portal einzeln gesperrt werden kann.
 ENROLL_TOKEN = os.environ.get("AGENT_TOKEN", "")
-TOKEN_FILE = os.environ.get("AGENT_TOKEN_FILE", "/etc/bfs-agent.token")
+
+
+def _standard_tokenpfad():
+    """Wo das Geräte-Token liegt.
+
+    Unter Linux /etc, unter Windows ProgramData — dort darf LocalSystem
+    schreiben, und ein angemeldeter Benutzer kommt ohne Adminrechte nicht
+    heran. Ein Token unter C:\\Users wäre für den Benutzer lesbar und damit
+    kein Geräte-Token mehr.
+    """
+    if platform.system() == "Windows":
+        basis = os.environ.get("ProgramData", r"C:\ProgramData")
+        return os.path.join(basis, "BFS", "bfs-agent.token")
+    return "/etc/bfs-agent.token"
+
+
+TOKEN_FILE = os.environ.get("AGENT_TOKEN_FILE") or _standard_tokenpfad()
 
 # Wird beim Anmelden gesetzt und für alle weiteren Aufrufe verwendet.
 device_token = ""
@@ -172,6 +232,12 @@ def load_token():
 
 def store_token(token):
     """Legt das Token mit 0600 ab — es ist der Schlüssel dieses Geräts."""
+    ordner = os.path.dirname(TOKEN_FILE)
+    if ordner:
+        os.makedirs(ordner, exist_ok=True)
+    # 0o600 wirkt nur unter Linux. Unter Windows schützt der Ort: ProgramData\BFS
+    # erbt die Rechte von ProgramData, Schreiben darf dort nur ein Administrator
+    # oder LocalSystem. Das Installationsskript engt den Ordner zusätzlich ein.
     fd = os.open(TOKEN_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
         fh.write(token)

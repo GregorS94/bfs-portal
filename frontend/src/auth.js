@@ -1,3 +1,16 @@
+// Basisadresse des Portals.
+//
+// Im Browser leer: die Oberfläche wird vom selben nginx ausgeliefert wie die
+// API, relative Pfade treffen also von selbst das Richtige. Im Desktop-
+// Programm ist der Ursprung `tauri://localhost` — dort muss die Adresse des
+// Portals beim Bauen mitgegeben werden (VITE_API_BASE).
+export const API_BASE = (import.meta.env?.VITE_API_BASE || '').replace(/\/$/, '');
+
+/** Setzt die Basisadresse vor einen API-Pfad. Ohne Basis bleibt alles wie bisher. */
+export function apiUrl(pfad) {
+  return pfad.startsWith('/') ? API_BASE + pfad : pfad;
+}
+
 // Anmeldung gegen Entra ID (Microsoft 365).
 //
 // Die Konfiguration kommt zur Laufzeit vom Backend (/api/config), nicht aus dem
@@ -23,7 +36,7 @@ export function authConfig() {
 }
 
 export async function initAuth() {
-  const res = await fetch('/api/config');
+  const res = await fetch(apiUrl('/api/config'));
   config = await res.json();
 
   if (!config.authEnabled) return config;
@@ -56,7 +69,7 @@ export function account() {
 // Einfacher Anmeldeweg: nur ein Name, kein Passwort. Das Backend stellt darauf
 // eine kurzlebige Sitzung aus — geprueft wurde nichts, das steht auch so im Log.
 export async function simpleSignIn(identity) {
-  const res = await fetch('/api/auth/simple', {
+  const res = await fetch(apiUrl('/api/auth/simple'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ identity })
@@ -96,7 +109,8 @@ async function accessToken() {
 }
 
 // Ersatz für fetch: hängt bei aktiver Anmeldung das Token an.
-export async function authedFetch(url, options = {}) {
+export async function authedFetch(pfad, options = {}) {
+  const url = apiUrl(pfad);
   if (mode() === 'simple') {
     const headers = { ...(options.headers || {}), Authorization: `Bearer ${simpleToken()}` };
     return fetch(url, { ...options, headers });

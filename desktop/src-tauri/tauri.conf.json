@@ -1,0 +1,46 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "BFS Support",
+  "version": "0.1.0",
+  "identifier": "de.bfs-abrechnung.support",
+  "build": {
+    "beforeBuildCommand": "npm --prefix ../../frontend run build",
+    "frontendDist": "../../frontend/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "BFS Support",
+        "width": 1180,
+        "height": 780,
+        "minWidth": 900,
+        "minHeight": 600,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' https://cdn.tailwindcss.com; connect-src 'self' ipc: http://ipc.localhost https://portal.bfs-abrechnung.de"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "msi",
+      "dmg"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "publisher": "Bank für Sozialwirtschaft",
+    "copyright": "© Bank für Sozialwirtschaft",
+    "shortDescription": "Self-Service-Portal für den IT-Support",
+    "windows": {
+      "wix": {
+        "language": "de-DE"
+      }
+    }
+  }
+}

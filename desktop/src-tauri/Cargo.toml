@@ -1,0 +1,20 @@
+[package]
+name = "bfs-support"
+version = "0.1.0"
+description = "BFS Self-Service Portal als Programm für Windows und macOS"
+edition = "2021"
+rust-version = "1.77"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+
+[profile.release]
+# Kleines Paket ist hier kein Selbstzweck: Es wird über baramundi auf jedes
+# Gerät verteilt, und die Datei liegt danach auf jedem davon.
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true

@@ -1,0 +1,71 @@
+# Baut das Desktop-Programm für Windows und macOS.
+#
+# Warum in der Cloud und nicht auf dem eigenen Rechner: Ein Windows-Paket
+# lässt sich nur unter Windows bauen, ein macOS-Paket nur unter macOS. GitHub
+# stellt beides bereit; wer nur einen Mac hat, käme sonst nie an ein .msi.
+#
+# Läuft auf Zuruf (Actions → Desktop → Run workflow) und bei jedem Tag v*.
+# Signiert wird hier noch nicht — dafür muss erst das Zertifikat vorliegen.
+# Wo es hingehört, steht unten als Kommentar.
+
+name: Desktop
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  bauen:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows
+          - os: macos-latest
+            name: macos
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # Rust-Abhängigkeiten sind der langsame Teil. Ohne Zwischenspeicher
+      # dauert jeder Lauf zehn Minuten länger.
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+
+      - name: Oberfläche vorbereiten
+        run: npm --prefix frontend install --no-audit --no-fund
+
+      - name: Werkzeug vorbereiten
+        run: npm --prefix desktop install --no-audit --no-fund
+
+      - name: Bauen
+        working-directory: desktop
+        env:
+          # Im Programm ist der Ursprung tauri://localhost — die API-Adresse
+          # muss also mit hinein. Als Variable im Repository hinterlegt
+          # (Settings → Secrets and variables → Actions → Variables).
+          VITE_API_BASE: ${{ vars.PORTAL_URL }}
+          # Hier kommen später die Zertifikate dazu:
+          #   Windows: TAURI_WINDOWS_SIGN_COMMAND oder signtool über eure PKI
+          #   macOS:   APPLE_CERTIFICATE, APPLE_SIGNING_IDENTITY,
+          #            APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID
+        run: npm run build
+
+      - name: Pakete einsammeln
+        uses: actions/upload-artifact@v4
+        with:
+          name: bfs-support-${{ matrix.name }}
+          if-no-files-found: error
+          path: |
+            desktop/src-tauri/target/release/bundle/msi/*.msi
+            desktop/src-tauri/target/release/bundle/dmg/*.dmg

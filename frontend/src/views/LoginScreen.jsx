@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { KeyRound, ShieldAlert } from 'lucide-react';
 import Wortmarke from '../Wortmarke';
+import { apiUrl } from '../auth';
 
 // Anmeldebildschirm. Drei Wege, je nach Betriebsart des Backends:
 //   entra  — Microsoft 365
@@ -32,7 +33,7 @@ export default function LoginScreen({ mode, ready, onSimpleSignIn, onEntraSignIn
     setError('');
     setBusy(true);
     try {
-      const res = await fetch('/api/public/password-help', {
+      const res = await fetch(apiUrl('/api/public/password-help'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(help)
