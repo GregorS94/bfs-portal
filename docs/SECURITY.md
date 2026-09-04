@@ -21,6 +21,35 @@ die Metazeichen interpretieren könnte.
 
 Im Test abgewiesen: `bash -c`, `curl`, `systemctl mask`, ein Argument mit `;`.
 
+## Windows: der Skripttext ist die Freigabe, nicht das Programm
+
+Unter Windows gibt es keinen der freigegebenen Linux-Befehle; alles läuft über
+PowerShell. `powershell.exe` einfach auf die Liste zu setzen, wäre wertlos —
+mit `-Command` liesse sich beliebiger Code ausführen, und die zweite
+Verteidigungslinie wäre keine mehr.
+
+Der Agent gibt deshalb nicht das Programm frei, sondern **den Skripttext**:
+
+- Der Aufruf muss mit `-NoProfile -NonInteractive -Command` beginnen.
+- Der Text dahinter muss Zeichen für Zeichen einem der elf Einträge in
+  `ALLOWED_POWERSHELL` entsprechen.
+- Parameter stehen nie im Text, sondern als eigene Argumente dahinter
+  (`$args[0]`) und werden wie unter Linux gegen `ARG_PATTERN` geprüft.
+
+Im Test abgewiesen: ein fremdes Skript, ein an ein echtes Skript angehängter
+zweiter Befehl, ein Aufruf ohne den festen Präfix, `-EncodedCommand`,
+`cmd.exe` und ein Parameter mit Sonderzeichen. Ebenfalls geprüft: Auf einem
+Linux-Gerät wird `powershell.exe` abgelehnt und umgekehrt.
+
+Die Liste ist eine bewusste Verdopplung dessen, was `actions.js` erzeugt.
+`tools/agent-allowlist-test.js` vergleicht beide Seiten, damit sie nicht still
+auseinanderlaufen.
+
+**Noch nicht auf echter Hardware geprüft:** Wie Python unter Windows die
+Argumentliste an `CreateProcess` übergibt (Anführungszeichen in den
+Skripttexten), lässt sich nur auf einem Windows-Rechner feststellen. Der
+Freigabe-Mechanismus ist geprüft, die Übergabe nicht.
+
 ## Vier-Augen bei Kontoaktionen
 
 `reset_ad_password` und `unlock_ad_account` tragen `fourEyes: true`. Für sie

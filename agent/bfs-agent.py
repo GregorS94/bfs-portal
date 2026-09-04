@@ -36,7 +36,7 @@ device_token = ""
 
 # --- Freigabeliste des Agenten -------------------------------------------------
 # Programm -> erlaubte erste Argumente (None = keine Einschränkung des Unterbefehls)
-ALLOWED = {
+ALLOWED_LINUX = {
     "df": None,
     "free": None,
     "uptime": None,
@@ -44,6 +44,52 @@ ALLOWED = {
     "systemctl": {"status", "restart", "list-units"},
     "journalctl": {"--vacuum-time=7d"},
 }
+
+# Unter Windows gibt es keinen dieser Befehle; dort laeuft alles ueber
+# PowerShell. Genau das ist die Gefahr: `powershell.exe` einfach freizugeben
+# hiesse, beliebigen Code zuzulassen, und die Freigabeliste waere wertlos.
+#
+# Deshalb wird hier nicht das Programm freigegeben, sondern der Skripttext:
+# er muss Zeichen fuer Zeichen einem der unten stehenden entsprechen. Parameter
+# stehen nie im Text, sondern als eigene Argumente dahinter ($args[0]) und
+# werden wie unter Linux gegen ARG_PATTERN geprueft.
+#
+# Die Liste ist eine bewusste Verdopplung von backend/actions.js. Der Agent
+# soll gerade nicht darauf vertrauen, was das Portal ihm schickt — waere das
+# Portal uebernommen, ist diese Datei die zweite Verteidigungslinie. Gegen
+# stilles Auseinanderlaufen prueft tools/agent-allowlist-test.js beide Listen
+# gegeneinander.
+PS_PRAEFIX = ["-NoProfile", "-NonInteractive", "-Command"]
+
+ALLOWED_POWERSHELL = {
+    # get_disk_space
+    'Get-PSDrive -PSProvider FileSystem | Format-Table -AutoSize',
+    # get_memory
+    'Get-CimInstance Win32_OperatingSystem | Select-Object TotalVisibleMemorySize,FreePhysicalMemory',
+    # get_uptime
+    '(Get-CimInstance Win32_OperatingSystem).LastBootUpTime',
+    # get_service_status
+    'Get-Service -Name $args[0] | Format-List',
+    # get_top_processes
+    'Get-Process | Sort-Object WS -Descending | Select-Object -First 10 Id,ProcessName,CPU,WS',
+    # get_failed_units
+    'Get-Service | Where-Object {$_.Status -ne "Running" -and $_.StartType -eq "Automatic"}',
+    # restart_service
+    'Restart-Service -Name $args[0] -Force',
+    # clear_journal_logs
+    'Clear-EventLog -LogName Application',
+    # get_ad_account_status
+    'Get-ADUser -Identity $args[0] -Properties LockedOut,Enabled,PasswordExpired,PasswordLastSet,LastLogonDate | Select-Object SamAccountName,Enabled,LockedOut,PasswordExpired,PasswordLastSet,LastLogonDate | Format-List',
+    # unlock_ad_account
+    'Unlock-ADAccount -Identity $args[0] -Confirm:$false; "Konto {0} entsperrt." -f $args[0]',
+    # reset_ad_password
+    '$b = [byte[]]::new(18); [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); $pw = \'Bfs!\' + [Convert]::ToBase64String($b).TrimEnd(\'=\').Replace(\'/\',\'x\').Replace(\'+\',\'y\'); Set-ADAccountPassword -Identity $args[0] -Reset -NewPassword (ConvertTo-SecureString $pw -AsPlainText -Force) -Confirm:$false; Set-ADUser -Identity $args[0] -ChangePasswordAtLogon $true; Unlock-ADAccount -Identity $args[0] -Confirm:$false; "Einmal-Passwort fuer {0}: {1}" -f $args[0], $pw',
+}
+
+ALLOWED_WINDOWS = {"powershell.exe": None}
+
+IST_WINDOWS = platform.system() == "Windows"
+ALLOWED = ALLOWED_WINDOWS if IST_WINDOWS else ALLOWED_LINUX
 
 ARG_PATTERN = re.compile(r"^[A-Za-z0-9._@=:/,%-]{0,128}$")
 
@@ -76,12 +122,22 @@ def check_allowed(command):
     if file not in ALLOWED:
         return f"Programm '{file}' steht nicht auf der Freigabeliste des Agenten."
 
-    allowed_subcommands = ALLOWED[file]
-    if allowed_subcommands is not None:
-        if not args or args[0] not in allowed_subcommands:
-            return f"Unterbefehl '{args[0] if args else ''}' ist für {file} nicht freigegeben."
+    if file == "powershell.exe":
+        if args[:3] != PS_PRAEFIX:
+            return "PowerShell darf nur mit -NoProfile -NonInteractive -Command aufgerufen werden."
+        if len(args) < 4 or args[3] not in ALLOWED_POWERSHELL:
+            return "Dieser PowerShell-Befehl steht nicht auf der Freigabeliste des Agenten."
+        # Der Skripttext ist durch den Vergleich oben abgedeckt; geprueft werden
+        # muessen die Parameter dahinter.
+        zu_pruefen = args[4:]
+    else:
+        allowed_subcommands = ALLOWED[file]
+        if allowed_subcommands is not None:
+            if not args or args[0] not in allowed_subcommands:
+                return f"Unterbefehl '{args[0] if args else ''}' ist für {file} nicht freigegeben."
+        zu_pruefen = args
 
-    for a in args:
+    for a in zu_pruefen:
         if not isinstance(a, str) or not ARG_PATTERN.match(a):
             return f"Argument enthält unerlaubte Zeichen: {a!r}"
 
