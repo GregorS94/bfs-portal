@@ -65,7 +65,7 @@ jobs:
 
       - name: Fehlende Portal-Adresse melden
         if: vars.PORTAL_URL == ''
-        run: echo "::warning::Die Variable PORTAL_URL ist nicht gesetzt. Das Paket entsteht, aber das Programm findet das Portal nicht."
+        run: echo "::error::Die Variable PORTAL_URL ist nicht gesetzt (Settings -> Secrets and variables -> Actions -> Variables). Ohne sie findet das Programm das Portal nicht."
 
       - name: Tauri vorbereiten
         working-directory: desktop
@@ -73,6 +73,13 @@ jobs:
 
       - name: Paket bauen
         working-directory: desktop
+        env:
+          # Zweimal dieselbe Variable, zwei verschiedene Zwecke: oben backt
+          # Vite die Adresse in die Oberfläche, hier entsteht daraus die
+          # Inhaltsrichtlinie des Fensters (csp.mjs). Fehlt sie, bricht der
+          # Bau ab — ein Paket, das das Portal nicht erreichen darf, wäre
+          # schlimmer als keins.
+          VITE_API_BASE: ${{ vars.PORTAL_URL }}
         # Hier kommen später die Zertifikate dazu:
         #   Windows: TAURI_WINDOWS_SIGN_COMMAND oder signtool über eure PKI
         #   macOS:   APPLE_CERTIFICATE, APPLE_SIGNING_IDENTITY,

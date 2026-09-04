@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "tauri dev",
-    "build": "tauri build",
-    "build:alles": "npm --prefix ../frontend run build && tauri build",
+    "csp": "node csp.mjs",
+    "build": "node csp.mjs && tauri build --config src-tauri/csp.json",
+    "build:alles": "npm --prefix ../frontend run build && npm run build",
     "tauri": "tauri"
   },
   "devDependencies": {

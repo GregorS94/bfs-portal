@@ -53,7 +53,7 @@ bauen, ein Mac-Paket nur unter macOS. Dafür gibt es
 `.github/workflows/desktop.yml` — Actions → Desktop → Run workflow, oder ein
 Tag `v*` setzen. Die Pakete hängen danach als Artefakt am Lauf.
 
-## `VITE_API_BASE`
+## `VITE_API_BASE` / `PORTAL_URL`
 
 Im Browser liefert derselbe nginx die Oberfläche und die API aus, `/api/...`
 trifft also von selbst das Richtige. Im Programm ist der Ursprung
@@ -63,6 +63,28 @@ sich nicht.
 
 In GitHub hinterlegt unter Settings → Secrets and variables → Actions →
 Variables als `PORTAL_URL`.
+
+**Form:** Schema und Rechnername, sonst nichts.
+
+```
+https://portal.bfs-abrechnung.de      richtig
+http://192.168.178.62:9000            richtig (Port erlaubt)
+https://portal.bfs-abrechnung.de/     falsch — Schrägstrich am Ende
+https://portal.bfs-abrechnung.de/api  falsch — /api hängt das Programm selbst an
+portal.bfs-abrechnung.de              falsch — ohne Schema keine Adresse
+```
+
+Der Schrägstrich am Ende wird abgeschnitten, das `/api` nicht: daraus würde
+`/api/api/...`.
+
+Massgeblich ist, was **vom Mitarbeitergerät aus** erreichbar ist. Für einen
+Versuch auf dem Pi ist das die 192er-Adresse; im Haus später der interne Name
+des Portals.
+
+Die Adresse steckt an zwei Stellen im Paket: Vite backt sie in die Oberfläche
+ein, und `csp.mjs` schreibt sie in die Inhaltsrichtlinie des Fensters — sonst
+verbietet das Programm sich selbst die Verbindung. Beides kommt aus derselben
+Variablen, damit es nicht auseinanderlaufen kann. Fehlt sie, bricht der Bau ab.
 
 ## Signieren
 

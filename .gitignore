@@ -16,6 +16,7 @@ build/
 # hierher: bei einem Programm (im Gegensatz zu einer Bibliothek) legt sie die
 # genauen Versionen fest, und genau das will man in einem beaufsichtigten Haus.
 desktop/src-tauri/target/
+desktop/src-tauri/csp.json
 
 *.bak
 *.log
