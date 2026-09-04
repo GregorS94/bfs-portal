@@ -1,10 +1,11 @@
 {
   "name": "bfs-support-desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "scripts": {
     "dev": "tauri dev",
     "build": "tauri build",
+    "build:alles": "npm --prefix ../frontend run build && tauri build",
     "tauri": "tauri"
   },
   "devDependencies": {

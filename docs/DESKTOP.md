@@ -33,10 +33,18 @@ eigener Freigabeliste, unabhängig vom Portal. Siehe
 Lokal (braucht Rust und die Systemwerkzeuge von Tauri):
 
 ```bash
-npm --prefix frontend install
-npm --prefix desktop install
-VITE_API_BASE=https://portal.bfs-abrechnung.de npm --prefix desktop run build
+cd frontend && npm install && VITE_API_BASE=https://portal.bfs-abrechnung.de npm run build
+cd ../desktop && npm install && npm run build
 ```
+
+Die Oberfläche wird **zuerst und getrennt** gebaut. Tauri ruft sie nicht mehr
+selbst auf: `beforeBuildCommand` läuft vom Ordner `desktop/` aus, `frontendDist`
+gilt relativ zur Konfigurationsdatei in `src-tauri/` — zwei Bezugspunkte in
+einer Datei, und genau daran ist der erste Lauf gescheitert. Ein Bezugspunkt
+weniger ist die bessere Lösung.
+
+`VITE_API_BASE` gehört an den **Bau der Oberfläche**, nicht an den von Tauri:
+Vite backt den Wert dort ein.
 
 Ergebnis unter `desktop/src-tauri/target/release/bundle/`.
 

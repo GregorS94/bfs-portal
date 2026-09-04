@@ -1,10 +1,9 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "BFS Support",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "identifier": "de.bfs-abrechnung.support",
   "build": {
-    "beforeBuildCommand": "npm --prefix ../../frontend run build",
     "frontendDist": "../../frontend/dist"
   },
   "app": {

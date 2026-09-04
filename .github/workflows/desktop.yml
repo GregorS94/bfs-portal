@@ -7,6 +7,12 @@
 # Läuft auf Zuruf (Actions → Desktop → Run workflow) und bei jedem Tag v*.
 # Signiert wird hier noch nicht — dafür muss erst das Zertifikat vorliegen.
 # Wo es hingehört, steht unten als Kommentar.
+#
+# Kein `npm --prefix` und kein `cd` in Befehlszeilen: `--prefix` verhält sich
+# unter Windows anders als unter Linux (npm suchte die package.json im
+# Wurzelverzeichnis statt im angegebenen Ordner), und `cd ../x && ...` bricht
+# sich an der Windows-Eingabeaufforderung. `working-directory` tut überall
+# dasselbe.
 
 name: Desktop
 
@@ -42,23 +48,35 @@ jobs:
         with:
           workspaces: desktop/src-tauri
 
-      - name: Oberfläche vorbereiten
-        run: npm --prefix frontend install --no-audit --no-fund
+      - name: Abhängigkeiten der Oberfläche
+        working-directory: frontend
+        run: npm install --no-audit --no-fund
 
-      - name: Werkzeug vorbereiten
-        run: npm --prefix desktop install --no-audit --no-fund
-
-      - name: Bauen
-        working-directory: desktop
+      - name: Oberfläche bauen
+        working-directory: frontend
         env:
-          # Im Programm ist der Ursprung tauri://localhost — die API-Adresse
-          # muss also mit hinein. Als Variable im Repository hinterlegt
-          # (Settings → Secrets and variables → Actions → Variables).
+          # Muss hier stehen, nicht beim Tauri-Schritt: Vite backt den Wert
+          # beim Bauen der Oberfläche ein. Im Programm ist der Ursprung
+          # tauri://localhost, ein relativer /api-Pfad ginge ins Leere.
+          # Hinterlegt unter Settings → Secrets and variables → Actions →
+          # Variables als PORTAL_URL.
           VITE_API_BASE: ${{ vars.PORTAL_URL }}
-          # Hier kommen später die Zertifikate dazu:
-          #   Windows: TAURI_WINDOWS_SIGN_COMMAND oder signtool über eure PKI
-          #   macOS:   APPLE_CERTIFICATE, APPLE_SIGNING_IDENTITY,
-          #            APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID
+        run: npm run build
+
+      - name: Fehlende Portal-Adresse melden
+        if: vars.PORTAL_URL == ''
+        run: echo "::warning::Die Variable PORTAL_URL ist nicht gesetzt. Das Paket entsteht, aber das Programm findet das Portal nicht."
+
+      - name: Tauri vorbereiten
+        working-directory: desktop
+        run: npm install --no-audit --no-fund
+
+      - name: Paket bauen
+        working-directory: desktop
+        # Hier kommen später die Zertifikate dazu:
+        #   Windows: TAURI_WINDOWS_SIGN_COMMAND oder signtool über eure PKI
+        #   macOS:   APPLE_CERTIFICATE, APPLE_SIGNING_IDENTITY,
+        #            APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID
         run: npm run build
 
       - name: Pakete einsammeln
