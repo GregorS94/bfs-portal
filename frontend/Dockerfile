@@ -1,15 +1,15 @@
 # --- Build-Stufe ---
-FROM node:18-alpine AS build
+# Node 22, weil Vite Node 20 oder neuer verlangt.
+FROM node:22-alpine AS build
 WORKDIR /app
-ENV CI=false
 COPY package.json ./
 RUN npm install --no-audit --no-fund
-COPY public ./public
+COPY index.html vite.config.js ./
 COPY src ./src
 RUN npm run build
 
 # --- Auslieferungs-Stufe ---
 FROM nginx:alpine
-COPY --from=build /app/build /usr/share/nginx/html
+COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
