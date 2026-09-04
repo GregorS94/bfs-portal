@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Entwurf — BFS Support (Desktop)</title>
+
+<!--
+  Entwurf für das Desktop-Programm (Windows und macOS).
+
+  Zweck: etwas Anklickbares, an dem sich entscheiden lässt, bevor gebaut wird.
+  Es ist eine reine Attrappe — keine Verbindung zum Backend, alle Inhalte
+  erfunden, aber in der Form, die echte Daten hätten.
+
+  Bewusst gezeigt werden die drei Dinge, die im Browser-Portal fehlen oder
+  anders sind:
+    1. Fensterrahmen und Ablage im Infobereich — das Programm läuft mit,
+       auch wenn niemand es offen hat.
+    2. Der Chat trägt den Hinweis, dass der IT-Support mitliest. Wer nicht
+       weiss, wer zusieht, schreibt anders.
+    3. Anfragen und Verlauf sind eigene Bereiche, nicht Reiter im Chat.
+
+  Die Farben, Schriften und Abstände stammen unverändert aus dem Portal
+  (frontend/index.html), damit beides als ein Haus erkennbar bleibt.
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&family=Open+Sans:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: { extend: {
+      colors: {
+        tinte:   '#331d0b',
+        gedimmt: '#6b5c4c',
+        leise:   '#8a7c6c',
+        akzent:  { DEFAULT: '#db6900', hell: '#ff7700', zart: '#fdf1e3', rand: '#f0c79a' },
+        linie:   '#e5e2dd',
+        flaeche: '#f6f5f3'
+      },
+      fontFamily: {
+        sans: ['Open Sans', 'system-ui', 'sans-serif'],
+        kopf: ['Lato', 'Open Sans', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'ui-monospace', 'monospace']
+      },
+      borderRadius: { DEFAULT: '3px', md: '4px', lg: '5px', xl: '6px', '2xl': '8px' }
+    } }
+  };
+</script>
+<style>
+  :root { color-scheme: light; }
+  body { font-family: 'Open Sans', system-ui, sans-serif; background: #d9d5cf; color: #331d0b; -webkit-font-smoothing: antialiased; }
+  h1, h2, h3 { font-family: 'Lato', 'Open Sans', sans-serif; }
+  .bfs-strich::after { content: ''; display: block; width: 44px; height: 2px; background: #db6900; margin-top: 6px; }
+  ::-webkit-scrollbar { width: 10px; }
+  ::-webkit-scrollbar-thumb { background: #d8d4cd; border-radius: 5px; border: 2px solid #f6f5f3; }
+</style>
+</head>
+
+<body class="p-8">
+
+<!-- Fensterrahmen: nur für den Entwurf gezeichnet. Im fertigen Programm ist
+     das der echte Rahmen des Betriebssystems. -->
+<div class="max-w-[1180px] mx-auto rounded-lg overflow-hidden shadow-2xl border border-[#c9c4bc] bg-white">
+
+  <!-- Titelleiste -->
+  <div class="h-9 bg-[#efece7] border-b border-linie flex items-center px-4 gap-3 select-none">
+    <div class="flex gap-2">
+      <span class="w-3 h-3 rounded-full bg-[#ff5f57]"></span>
+      <span class="w-3 h-3 rounded-full bg-[#febc2e]"></span>
+      <span class="w-3 h-3 rounded-full bg-[#28c840]"></span>
+    </div>
+    <div class="flex-1 text-center text-xs text-gedimmt font-semibold tracking-wide">BFS Support</div>
+    <div class="text-[11px] text-leise">Version 1.0.0</div>
+  </div>
+
+  <div class="flex h-[720px]">
+
+    <!-- Seitenleiste -->
+    <aside class="w-60 bg-flaeche border-r border-linie flex flex-col">
+      <div class="px-5 pt-5 pb-4 border-b border-linie">
+        <div class="font-kopf font-black text-xl leading-none bfs-strich">BFS</div>
+        <div class="text-xs text-gedimmt mt-2">Support</div>
+      </div>
+
+      <nav class="p-3 space-y-1 flex-1">
+        <button onclick="zeige('chat')" data-reiter="chat"
+          class="reiter w-full text-left px-3 py-2.5 rounded flex items-center gap-3 text-sm">
+          <span class="ikone">💬</span>
+          <span class="flex-1">Chat</span>
+        </button>
+        <button onclick="zeige('anfragen')" data-reiter="anfragen"
+          class="reiter w-full text-left px-3 py-2.5 rounded flex items-center gap-3 text-sm">
+          <span class="ikone">🎫</span>
+          <span class="flex-1">Meine Anfragen</span>
+          <span class="text-[11px] font-semibold bg-akzent text-white rounded-full px-1.5 py-0.5">2</span>
+        </button>
+        <button onclick="zeige('verlauf')" data-reiter="verlauf"
+          class="reiter w-full text-left px-3 py-2.5 rounded flex items-center gap-3 text-sm">
+          <span class="ikone">🕘</span>
+          <span class="flex-1">Verlauf</span>
+        </button>
+      </nav>
+
+      <div class="p-3 border-t border-linie">
+        <div class="px-3 py-2.5 rounded bg-white border border-linie">
+          <div class="text-[11px] text-leise">Angemeldet als</div>
+          <div class="text-sm font-semibold truncate">Gregor Steppat</div>
+          <div class="text-[11px] text-leise truncate">g.steppat@bfs-abrechnung.de</div>
+        </div>
+        <div class="mt-2 px-3 text-[11px] text-leise leading-relaxed">
+          Läuft im Hintergrund weiter und meldet sich, wenn die IT antwortet.
+        </div>
+      </div>
+    </aside>
+
+    <!-- ============================ CHAT ============================ -->
+    <main data-ansicht="chat" class="ansicht flex-1 flex flex-col min-w-0">
+      <header class="h-16 border-b border-linie px-6 flex items-center justify-between">
+        <div>
+          <h1 class="font-semibold">Chat mit dem IT-Support</h1>
+          <p class="text-xs text-leise">Ticket #4711 · Drucker im 2. OG</p>
+        </div>
+        <div class="flex items-center gap-2 text-xs">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+          <span class="text-gedimmt">Sarah K. liest mit</span>
+        </div>
+      </header>
+
+      <!-- Der wichtigste Unterschied zum Browser: hier steht sichtbar, wer
+           mitliest. Ohne das schreiben Leute Dinge, die sie nicht schreiben
+           würden, wenn sie es wüssten. -->
+      <div class="px-6 py-2 bg-akzent-zart border-b border-akzent-rand text-xs text-[#8a5200] flex items-center gap-2">
+        <span>ℹ️</span>
+        <span>Dieser Verlauf ist für den IT-Support sichtbar und wird protokolliert.</span>
+      </div>
+
+      <div class="flex-1 overflow-y-auto px-6 py-6 space-y-5 bg-flaeche">
+
+        <div class="text-center text-[11px] text-leise">Heute, 09:12</div>
+
+        <div class="flex justify-end">
+          <div class="max-w-[70%] bg-akzent text-white rounded-2xl rounded-br px-4 py-2.5 text-sm leading-relaxed">
+            Der Drucker im 2. OG nimmt keine Aufträge mehr an. Warteschlange steht bei 6 Dokumenten.
+          </div>
+        </div>
+
+        <div class="flex gap-3">
+          <div class="w-8 h-8 rounded-full bg-tinte text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">KI</div>
+          <div class="max-w-[70%] space-y-2">
+            <div class="bg-white border border-linie rounded-2xl rounded-bl px-4 py-2.5 text-sm leading-relaxed">
+              Ich sehe auf deinem Gerät nach. Einen Moment.
+            </div>
+            <!-- Werkzeugaufruf: sichtbar, aber zurückhaltend. Der Nutzer soll
+                 sehen, dass etwas auf seinem Rechner passiert ist. -->
+            <div class="bg-white border border-linie rounded px-3 py-2 text-xs font-mono text-gedimmt flex items-center gap-2">
+              <span class="text-emerald-600">✓</span>
+              <span>Druckerwarteschlange gelesen — 6 Aufträge, ältester 41 Min.</span>
+            </div>
+            <div class="bg-white border border-linie rounded-2xl rounded-bl px-4 py-2.5 text-sm leading-relaxed">
+              Die Warteschlange hängt an einem Auftrag von 08:31. Ich kann sie leeren — deine Dokumente müsstest du danach neu senden.
+            </div>
+          </div>
+        </div>
+
+        <!-- Freigabe: die Entscheidung liegt beim Menschen, nicht beim Modell. -->
+        <div class="ml-11 max-w-[70%] border border-akzent-rand bg-akzent-zart rounded-lg p-4">
+          <div class="flex items-start gap-2 mb-3">
+            <span>⚠️</span>
+            <div>
+              <div class="text-sm font-semibold">Freigabe nötig</div>
+              <div class="text-xs text-gedimmt mt-0.5">Warteschlange leeren · schreibender Zugriff · wird protokolliert</div>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button class="px-4 py-1.5 bg-akzent hover:bg-akzent-hell text-white text-sm rounded transition-colors">Freigeben</button>
+            <button class="px-4 py-1.5 bg-white border border-linie text-sm rounded hover:border-gedimmt transition-colors">Ablehnen</button>
+          </div>
+        </div>
+
+        <div class="flex gap-3">
+          <div class="w-8 h-8 rounded-full bg-[#4a6fa5] text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">SK</div>
+          <div class="max-w-[70%]">
+            <div class="text-[11px] text-leise mb-1">Sarah K. · IT-Support · 09:15</div>
+            <div class="bg-white border-l-2 border-[#4a6fa5] border-y border-r border-linie rounded-2xl rounded-bl px-4 py-2.5 text-sm leading-relaxed">
+              Ich schau parallel auf den Druckserver. Gib ruhig frei, ich habe den Auftrag hier auch schon gesehen.
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="border-t border-linie p-4 bg-white">
+        <div class="flex gap-2">
+          <input placeholder="Nachricht schreiben…"
+            class="flex-1 border border-linie rounded px-4 py-2.5 text-sm focus:outline-none focus:border-akzent">
+          <button class="px-4 bg-akzent hover:bg-akzent-hell text-white rounded transition-colors">➤</button>
+        </div>
+        <div class="mt-2 flex items-center gap-4 text-[11px] text-leise">
+          <span>📎 Datei anhängen</span>
+          <span>🖥️ Bildschirmfoto beilegen</span>
+          <span class="ml-auto">Enter sendet · Umschalt+Enter neue Zeile</span>
+        </div>
+      </div>
+    </main>
+
+    <!-- ========================= MEINE ANFRAGEN ========================= -->
+    <main data-ansicht="anfragen" class="ansicht hidden flex-1 flex flex-col min-w-0">
+      <header class="h-16 border-b border-linie px-6 flex items-center justify-between">
+        <div>
+          <h1 class="font-semibold">Meine Anfragen</h1>
+          <p class="text-xs text-leise">2 offen · 1 wartet auf dich · 14 erledigt</p>
+        </div>
+        <input placeholder="Suchen…" class="border border-linie rounded px-3 py-1.5 text-sm w-56 focus:outline-none focus:border-akzent">
+      </header>
+
+      <div class="px-6 pt-4 flex gap-2 text-xs">
+        <button class="px-3 py-1.5 rounded-full bg-tinte text-white">Alle</button>
+        <button class="px-3 py-1.5 rounded-full bg-white border border-linie hover:border-gedimmt">Offen</button>
+        <button class="px-3 py-1.5 rounded-full bg-white border border-linie hover:border-gedimmt">Wartet auf mich</button>
+        <button class="px-3 py-1.5 rounded-full bg-white border border-linie hover:border-gedimmt">Erledigt</button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto p-6 space-y-3">
+
+        <div class="bg-white border border-akzent-rand rounded-lg p-4 hover:shadow-sm transition-shadow cursor-pointer">
+          <div class="flex items-start justify-between gap-4">
+            <div class="min-w-0">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-[11px] font-mono text-leise">#4713</span>
+                <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-akzent-zart text-[#8a5200] border border-akzent-rand">Wartet auf dich</span>
+              </div>
+              <div class="font-semibold text-sm">Zugriff auf Laufwerk P: beantragt</div>
+              <p class="text-xs text-gedimmt mt-1 leading-relaxed">
+                Sarah K.: „Dein Vorgesetzter muss den Zugriff bestätigen. Kannst du die Freigabe im Anhang unterschreiben?"
+              </p>
+            </div>
+            <div class="text-right flex-shrink-0">
+              <div class="text-[11px] text-leise">vor 20 Min.</div>
+              <div class="mt-2 w-2 h-2 rounded-full bg-akzent ml-auto"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white border border-linie rounded-lg p-4 hover:shadow-sm transition-shadow cursor-pointer">
+          <div class="flex items-start justify-between gap-4">
+            <div class="min-w-0">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-[11px] font-mono text-leise">#4711</span>
+                <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#e9f5ec] text-[#1f6b39] border border-[#b7dcc1]">In Arbeit</span>
+              </div>
+              <div class="font-semibold text-sm">Drucker im 2. OG nimmt keine Aufträge an</div>
+              <p class="text-xs text-gedimmt mt-1 leading-relaxed">
+                Sarah K. bearbeitet den Auftrag · zuletzt geantwortet 09:15
+              </p>
+            </div>
+            <div class="text-right flex-shrink-0">
+              <div class="text-[11px] text-leise">heute</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white border border-linie rounded-lg p-4 hover:shadow-sm transition-shadow cursor-pointer">
+          <div class="flex items-start justify-between gap-4">
+            <div class="min-w-0">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-[11px] font-mono text-leise">#4702</span>
+                <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#f1eeea] text-gedimmt border border-linie">Offen</span>
+              </div>
+              <div class="font-semibold text-sm">Outlook fragt jeden Morgen nach dem Kennwort</div>
+              <p class="text-xs text-gedimmt mt-1 leading-relaxed">
+                Noch niemand zugewiesen · seit gestern
+              </p>
+            </div>
+            <div class="text-right flex-shrink-0">
+              <div class="text-[11px] text-leise">gestern</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-4 pb-2 text-xs font-semibold text-leise uppercase tracking-wide">Erledigt</div>
+
+        <div class="bg-white border border-linie rounded-lg p-4 opacity-75 hover:opacity-100 transition-opacity cursor-pointer">
+          <div class="flex items-start justify-between gap-4">
+            <div class="min-w-0">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-[11px] font-mono text-leise">#4698</span>
+                <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#f1eeea] text-gedimmt border border-linie">Erledigt</span>
+              </div>
+              <div class="font-semibold text-sm">Festplatte voll — Zwischenspeicher geleert</div>
+              <p class="text-xs text-gedimmt mt-1">Von dir bestätigt am 28.08.</p>
+            </div>
+            <div class="text-right flex-shrink-0"><div class="text-[11px] text-leise">28.08.</div></div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- ============================ VERLAUF ============================ -->
+    <main data-ansicht="verlauf" class="ansicht hidden flex-1 flex min-w-0">
+
+      <div class="w-80 border-r border-linie flex flex-col">
+        <div class="h-16 border-b border-linie px-5 flex items-center">
+          <input placeholder="Im Verlauf suchen…" class="w-full border border-linie rounded px-3 py-1.5 text-sm focus:outline-none focus:border-akzent">
+        </div>
+        <div class="flex-1 overflow-y-auto">
+          <div class="px-5 py-2 text-[11px] font-semibold text-leise uppercase tracking-wide bg-flaeche">Diese Woche</div>
+
+          <button class="w-full text-left px-5 py-3 border-b border-linie bg-akzent-zart border-l-2 border-l-akzent">
+            <div class="text-sm font-semibold truncate">Drucker im 2. OG</div>
+            <div class="text-xs text-gedimmt truncate mt-0.5">Die Warteschlange hängt an einem Auftrag…</div>
+            <div class="text-[11px] text-leise mt-1">heute · #4711</div>
+          </button>
+
+          <button class="w-full text-left px-5 py-3 border-b border-linie hover:bg-flaeche transition-colors">
+            <div class="text-sm font-semibold truncate">Outlook fragt nach Kennwort</div>
+            <div class="text-xs text-gedimmt truncate mt-0.5">Ich habe das Anmeldedatenspeicher…</div>
+            <div class="text-[11px] text-leise mt-1">gestern · #4702</div>
+          </button>
+
+          <div class="px-5 py-2 text-[11px] font-semibold text-leise uppercase tracking-wide bg-flaeche">August</div>
+
+          <button class="w-full text-left px-5 py-3 border-b border-linie hover:bg-flaeche transition-colors">
+            <div class="text-sm font-semibold truncate">Festplatte voll</div>
+            <div class="text-xs text-gedimmt truncate mt-0.5">14 GB im Zwischenspeicher gefunden…</div>
+            <div class="text-[11px] text-leise mt-1">28.08. · #4698</div>
+          </button>
+
+          <button class="w-full text-left px-5 py-3 border-b border-linie hover:bg-flaeche transition-colors">
+            <div class="text-sm font-semibold truncate">VPN verbindet sich nicht</div>
+            <div class="text-xs text-gedimmt truncate mt-0.5">Der Netzwerkadapter stand auf…</div>
+            <div class="text-[11px] text-leise mt-1">21.08. · #4671</div>
+          </button>
+        </div>
+      </div>
+
+      <div class="flex-1 flex flex-col min-w-0 bg-flaeche">
+        <header class="h-16 border-b border-linie px-6 flex items-center justify-between bg-white">
+          <div>
+            <h1 class="font-semibold">Drucker im 2. OG</h1>
+            <p class="text-xs text-leise">Ticket #4711 · begonnen heute 09:12 · Sarah K.</p>
+          </div>
+          <button class="text-xs px-3 py-1.5 border border-linie rounded hover:border-gedimmt transition-colors">Als PDF sichern</button>
+        </header>
+        <div class="flex-1 overflow-y-auto px-6 py-6 space-y-4">
+          <div class="text-center text-[11px] text-leise">Heute, 09:12</div>
+          <div class="flex justify-end">
+            <div class="max-w-[70%] bg-akzent text-white rounded-2xl rounded-br px-4 py-2.5 text-sm">
+              Der Drucker im 2. OG nimmt keine Aufträge mehr an.
+            </div>
+          </div>
+          <div class="flex gap-3">
+            <div class="w-8 h-8 rounded-full bg-tinte text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">KI</div>
+            <div class="max-w-[70%] bg-white border border-linie rounded-2xl rounded-bl px-4 py-2.5 text-sm">
+              Ich sehe auf deinem Gerät nach. Einen Moment.
+            </div>
+          </div>
+          <div class="text-center text-[11px] text-leise pt-4">Dieser Verlauf wird 90 Tage aufbewahrt.</div>
+        </div>
+      </div>
+    </main>
+
+  </div>
+
+  <!-- Fussleiste: der Zustand, den ein Programm hat und eine Webseite nicht. -->
+  <div class="h-8 bg-[#efece7] border-t border-linie px-4 flex items-center justify-between text-[11px] text-gedimmt">
+    <div class="flex items-center gap-2">
+      <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+      <span>Verbunden mit portal.bfs-abrechnung.de</span>
+    </div>
+    <div class="flex items-center gap-4">
+      <span>Gerät: BFS-NB-0428</span>
+      <span>Agent aktiv</span>
+    </div>
+  </div>
+
+</div>
+
+<p class="max-w-[1180px] mx-auto mt-4 text-xs text-[#6b5c4c]">
+  Entwurf — keine echten Daten, keine Verbindung zum Backend. Farben, Schriften und Abstände wie im Portal.
+</p>
+
+<script>
+  function zeige(name) {
+    document.querySelectorAll('.ansicht').forEach(el => {
+      el.classList.toggle('hidden', el.dataset.ansicht !== name);
+      el.classList.toggle('flex', el.dataset.ansicht === name);
+    });
+    document.querySelectorAll('.reiter').forEach(el => {
+      const aktiv = el.dataset.reiter === name;
+      el.classList.toggle('bg-akzent-zart', aktiv);
+      el.classList.toggle('text-akzent', aktiv);
+      el.classList.toggle('font-semibold', aktiv);
+      el.classList.toggle('hover:bg-white', !aktiv);
+    });
+  }
+  // Beim Entwurf darf die Adresszeile die Ansicht wählen — praktisch zum
+  // Herzeigen und für Bildschirmfotos: …/desktop-app.html#anfragen
+  const erlaubt = ['chat', 'anfragen', 'verlauf'];
+  const start = location.hash.replace('#', '');
+  zeige(erlaubt.includes(start) ? start : 'chat');
+  window.addEventListener('hashchange', () => {
+    const n = location.hash.replace('#', '');
+    if (erlaubt.includes(n)) zeige(n);
+  });
+</script>
+
+</body>
+</html>
