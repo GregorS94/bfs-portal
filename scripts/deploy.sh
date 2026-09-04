@@ -28,6 +28,10 @@ cd "$REPO_ROOT"
 # sie enthält die Zugangsdaten und gehört nicht ins Repository.
 EXCLUDES=(
   --exclude '.git' --exclude 'node_modules' --exclude '.env'
+  # Baustaende gehoeren nicht auf den Host: der Container baut selbst. Lagen sie
+  # dort, meldete der Drift-Check beim naechsten Mal eine Abweichung, die nur
+  # vom eigenen lokalen Bauen stammte.
+  --exclude 'dist' --exclude 'build'
   --exclude 'docs' --exclude 'scripts' --exclude 'README.md'
   --exclude 'AGENTS.md' --exclude '.gitignore' --exclude '.env.example'
   --exclude '*.bak' --exclude '._*' --exclude '.deployed-commit'
