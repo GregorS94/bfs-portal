@@ -22,7 +22,7 @@ app.set('trust proxy', 1);
 app.use(express.json({ limit: '1mb' }));
 app.use(cors());
 
-const anthropic = new Anthropic();
+const anthropic = new /** @type {any} */ (Anthropic)();
 const MODEL = 'claude-opus-5';
 const AGENT_TOKEN = process.env.AGENT_TOKEN || '';
 
@@ -908,7 +908,7 @@ function runPrune() {
   }
 }
 
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT) || 3000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Backend läuft auf Port ${PORT} (Modell: ${MODEL}, Aktionen: ${Object.keys(ACTIONS).length})`);
 

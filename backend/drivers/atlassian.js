@@ -68,6 +68,10 @@ function authHeader() {
   return `Basic ${Buffer.from(raw, 'utf8').toString('base64')}`;
 }
 
+/**
+ * @param {string} path
+ * @param {{ method?: string, body?: unknown }} [optionen]
+ */
 async function call(path, { method = 'GET', body } = {}) {
   if (!isConfigured()) throw new Error('Atlassian ist nicht konfiguriert.');
   const res = await fetch(`${cfg().baseUrl}${path}`, {
@@ -108,6 +112,11 @@ function cqlQuote(value) {
 /**
  * Volltextsuche in Confluence. Liefert Titel, Auszug und Link.
  * Nur lesend — der Treiber schreibt nie in die Wissensdatenbank.
+ */
+/**
+ * @param {unknown} query   Suchbegriff, kommt roh aus der Abfragezeichenkette
+ * @param {unknown} [limit] Trefferzahl; als Text erlaubt, wird unten begrenzt
+ * @param {{ withBody?: boolean, bodyCount?: number }} [optionen]
  */
 async function searchKnowledge(query, limit = 5, { withBody = false, bodyCount = 2 } = {}) {
   const text = String(query || '').trim();

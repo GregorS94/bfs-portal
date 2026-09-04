@@ -5,13 +5,13 @@ import SettingsPanel from './SettingsPanel';
 
 // Administrativer Bereich: Zustand der Dienste und der Konfiguration.
 export default function AdminArea() {
-  const [health, setHealth] = useState({ services: [], checkedAt: null, loading: false });
+  const [health, setHealth] = useState({ services: [], checkedAt: null, loading: false, error: false });
 
   const load = async () => {
     setHealth(h => ({ ...h, loading: true }));
     try {
       const data = await (await authedFetch('/api/health/services')).json();
-      setHealth({ ...data, loading: false });
+      setHealth({ ...data, loading: false, error: false });
     } catch {
       setHealth({ services: [], checkedAt: null, loading: false, error: true });
     }
@@ -39,6 +39,12 @@ export default function AdminArea() {
             </span>
           )}
         </div>
+
+        {health.error && (
+          <div className="mb-4 px-4 py-3 rounded border font-semibold bg-[#fbeaea] border-[#e8bcbc] text-[#a32020]">
+            Die Prüfung selbst ist fehlgeschlagen — die Liste unten sagt nichts über den Zustand der Dienste aus.
+          </div>
+        )}
 
         {health.services.length > 0 && (
           <div className={`mb-4 px-4 py-3 rounded border font-semibold ${

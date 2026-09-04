@@ -143,7 +143,7 @@ export default function App() {
           {area.subtitle && <p className="text-xs text-leise">{area.subtitle}</p>}
         </div>
 
-        {allowed ? <Body user={user} /> : (
+        {allowed ? <Body /> : (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
               <p className="text-lg font-bold text-tinte mb-1">Kein Zugriff</p>

@@ -49,7 +49,7 @@ function hash(token) {
 function enroll(deviceId) {
   const agents = load();
   if (agents[deviceId]?.revoked) {
-    const err = new Error('Dieses Gerät ist gesperrt.');
+    const err = /** @type {Error & { code?: string }} */ (new Error('Dieses Gerät ist gesperrt.'));
     err.code = 'REVOKED';
     throw err;
   }

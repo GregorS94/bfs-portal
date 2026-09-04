@@ -201,6 +201,10 @@ function listDevices() {
   }));
 }
 
+/**
+ * @param {{ deviceId: string, action: string, params?: object, risk: string,
+ *           requestedBy?: string, reason?: string, driver?: string }} auftrag
+ */
 function createJob({ deviceId, action, params, risk, requestedBy, reason, driver = 'local' }) {
   const job = {
     id: crypto.randomUUID(),
@@ -279,6 +283,13 @@ function waitForJob(deviceId, timeoutMs = 25_000) {
   });
 }
 
+/**
+ * Schliesst einen Auftrag ab. Je nach Ausgang kommt entweder ein Ergebnis
+ * oder ein Fehler herein — nie beides, nie alles.
+ *
+ * @param {string} id
+ * @param {{ output?: string, exitCode?: number, error?: string }} ergebnis
+ */
 function completeJob(id, { output, exitCode, error }) {
   const job = jobs.get(id);
   if (!job) return null;
