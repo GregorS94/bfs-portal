@@ -32,6 +32,52 @@ Compliance-Läufe, die nicht in ein Chatfenster gehören.
 `interpretState()` und ob ein bMS-Job Rohausgabe zurückliefert oder nur einen
 Status (siehe `docs/STATUS.md`, Punkt 3).
 
+## bConnect v2 — der Treiber spricht die alte Fassung
+
+Es gibt inzwischen eine zweite Fassung der Schnittstelle. Das zugehörige
+PowerShell-Modul
+([bConnectV2](https://www.powershellgallery.com/packages/bConnectV2), Version
+26.1.101) ist öffentlich; die folgenden Angaben stammen aus seinem Quelltext,
+nicht aus Vermutungen.
+
+**Adressen.** Basis ist `https://{host}[:port]/bconnect/{bereich}`, darunter
+`/v2.0/…`. Der Bereich ist der Modulname in Kleinbuchstaben — `jobs`,
+`endpoints`, `software`, `activedirectory`. Ein Aufruf sieht also so aus:
+`https://bserver:8443/bconnect/jobs/v2.0/JobInstances`.
+
+**Anmeldung.** `Authorization: Basic …` **oder** `X-API-KEY: …`
+(`Private/Add-SecurityHeader.ps1`). Der API-Schlüssel ist der bessere Weg: Der
+Treiber schickt heute bei jedem Aufruf Benutzername und Passwort eines
+Dienstkontos mit.
+
+**Jobs.** Saubere Pfade statt der Umwege von v1:
+
+    POST /v2.0/JobInstances
+    GET  /v2.0/JobInstances/{id}
+    POST /v2.0/JobInstances/{id}/Start
+    POST /v2.0/JobInstances/{id}/Stop
+    POST /v2.0/JobInstances/{id}/Resume
+    GET  /v2.0/Endpoints/{endpointId}/JobInstances
+
+In v1 wird eine Instanz per `GET` angelegt — so macht es das Herstellermodul,
+und so steht es auch in unserem Treiber. In v2 entfällt diese Kuriosität.
+
+**Zwei Dinge, die neu interessant sind:**
+
+- `Get-bCSoftwareInstalledWindowsSoftwareByEndpointId` — installierte Software
+  je Gerät. Für ein Supportgespräch („welche Version hast du?") direkt
+  brauchbar, ohne einen Job auszulösen.
+- **Kiosk-Freigaben** (`New-bCJobsKioskRelease`,
+  `Get-bCJobsKioskReleasesByEndpointId`). Laut Modulbeschreibung entstehen
+  JobInstances auch dann, wenn ein Anwender sie über den baramundi Kiosk
+  anfordert — vorausgesetzt, ein Administrator hat die Jobdefinition für ihn
+  freigegeben. Damit gäbe es einen zweiten Weg für Softwarewünsche: Das Portal
+  **gibt frei**, statt selbst zu installieren, und der Mitarbeiter holt sich
+  die Software im Kiosk. Freigabe und Ausführung wären damit sauber getrennt.
+
+**Was auch v2 nicht liefert:** keine Endpunkte für Plattenplatz, Speicher oder
+Dienstzustände. Die Live-Diagnose bleibt also beim PowerShell-Job.
+
 ## Die Lücke zum eigenen Agenten
 
 Die Aktionen in `backend/actions.js` zerfallen in drei Gruppen:
@@ -86,7 +132,9 @@ Freigabe laufen.
 
 ## Offene Fragen an die IT
 
-1. Welche bMS-Version läuft? Davon hängt `BCONNECT_VERSION` ab (aktuell `v1.0`).
+1. Welche bMS-Version läuft — und ist **bConnect v2** darin enthalten? Davon
+   hängt ab, ob der Treiber auf `v2.0` und den API-Schlüssel umgestellt werden
+   kann (er steht heute auf `v1.0` mit Basic-Auth).
 2. Liefert eine JobInstance **Rohausgabe** oder nur einen Status? Das
    entscheidet, ob Diagnose über Jobs überhaupt taugt.
 3. Wie heißen die Endzustände einer JobInstance? `interpretState()` rät
@@ -95,6 +143,8 @@ Freigabe laufen.
 5. Darf das Portal Jobs **auslösen** oder nur lesen?
 6. Wer legt den API-Benutzer an, mit welchen Rechten?
 7. Ist der bMS-Server aus dem Netz des Portals erreichbar?
+8. Wird der **Kiosk** eingesetzt? Dann wäre er der natürliche Weg für
+   Softwarewünsche.
 
 ## Empfehlung
 
