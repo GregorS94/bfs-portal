@@ -92,6 +92,8 @@ Seitenkörper nachgeladen und aus dem XHTML Fließtext gemacht.
 3. **bConnect am echten Server prüfen.** Verifiziert ist nur gegen die
    Attrappe. Offen sind die Feldnamen der JobInstance-Zustände
    (`interpretState()`) und ob ein bMS-Job Rohausgabe liefert oder nur Status.
+   Fragen an die IT und die Folgen für den eigenen Agenten stehen in
+   [`docs/BARAMUNDI.md`](BARAMUNDI.md).
 4. **Software-Tab ist eine Attrappe.**
 5. **Freigabe eines fremden Auftrags als `user`** ist am laufenden System
    ungeprüft — dafür braucht es zwei echte Identitäten. Die Regel selbst ist
