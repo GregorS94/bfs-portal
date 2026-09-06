@@ -78,11 +78,18 @@ und so steht es auch in unserem Treiber. In v2 entfällt diese Kuriosität.
 **Was auch v2 nicht liefert:** keine Endpunkte für Plattenplatz, Speicher oder
 Dienstzustände. Die Live-Diagnose bleibt also beim PowerShell-Job.
 
-**Umgesetzt am 2026-09-06:** Der Treiber spricht jetzt beide Fassungen,
-`BCONNECT_VERSION` entscheidet. v2 nimmt `BCONNECT_API_KEY` und legt Instanzen
-per `POST` an; v1 bleibt unverändert. Geprüft mit `node tools/bconnect-test.js`
-(27 Prüfungen über v1, v2 mit Schlüssel und v2 mit Basic) — gegen die Attrappe,
-nicht gegen einen echten Server.
+**Umgesetzt am 2026-09-06:** Der Treiber spricht beide Fassungen,
+`BCONNECT_VERSION` entscheidet; **v2.0 ist die Vorgabe**, weil BFS auf bMC 26.1
+ist. v2 nimmt `BCONNECT_API_KEY` und legt Instanzen per `POST` an; v1 bleibt
+unverändert erreichbar. Dazu gibt es das lesende Werkzeug
+`list_installed_software` — es beantwortet „welche Version hast du", ohne einen
+Job auszulösen, und hängt nicht an der Job-Freigabeliste.
+
+Geprüft mit `node tools/bconnect-test.js` (30 Prüfungen über v1, v2 mit
+Schlüssel und v2 mit Basic) — gegen die Attrappe, nicht gegen einen echten
+Server. Die Feldnamen der Softwareliste sind im Herstellermodul nicht
+modelliert; der Treiber fragt mehrere Kandidaten ab und muss am echten Server
+nachgeschärft werden.
 
 ## Die Lücke zum eigenen Agenten
 

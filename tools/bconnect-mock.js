@@ -23,6 +23,14 @@ const ENDPOINTS = [
   { Id: 'ep-0002', HostName: 'PC-SCHMIDT', OS: 'Windows 11 24H2', LastContact: '2026-08-28T06:10:00Z' }
 ];
 
+const SOFTWARE = {
+  'ep-0001': [
+    { displayName: 'Google Chrome', displayVersion: '141.0.7390.55', publisher: 'Google LLC' },
+    { displayName: '7-Zip', displayVersion: '24.09', publisher: 'Igor Pavlov' }
+  ],
+  'ep-0002': []
+};
+
 const JOBS = [
   { Id: 'job-gpupdate', Name: 'gpupdate', Comment: 'Gruppenrichtlinien aktualisieren' },
   { Id: 'job-chrome', Name: 'Chrome Cache leeren', Comment: 'Browser-Cache des Nutzers loeschen' },
@@ -98,6 +106,9 @@ function v2(req, res, url) {
   if (ressource === 'Endpoints' && !id) {
     return json({ data: ENDPOINTS.map((e) => klein({ ...e, displayName: e.HostName })) });
   }
+  if (ressource === 'WindowsEndpoints' && befehl === 'InstalledWindowsSoftware') {
+    return json({ data: SOFTWARE[id] || [] });
+  }
   if (ressource === 'JobDefinitions' && !id) {
     return json({ data: JOBS.map((j) => klein({ ...j, displayName: j.Name })) });
   }
@@ -149,7 +160,7 @@ function leseKoerper(req, weiter) {
 
 const PORT = Number(process.argv[2] || 8443);
 
-module.exports = { server, PORT, USER, PASS, APIKEY, ENDPOINTS, JOBS, instances };
+module.exports = { server, PORT, USER, PASS, APIKEY, ENDPOINTS, JOBS, SOFTWARE, instances };
 
 // Nur starten, wenn direkt aufgerufen — bconnect-test.js bindet die Attrappe
 // ein und startet sie selbst.

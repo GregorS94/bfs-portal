@@ -1,5 +1,7 @@
 // Treiber für baramundi bConnect. Spricht wahlweise die alte oder die neue
-// Fassung der Schnittstelle; `BCONNECT_VERSION` entscheidet.
+// Fassung der Schnittstelle; `BCONNECT_VERSION` entscheidet. Vorgabe ist v2.0
+// — BFS fährt bMC 26.1, und v2 erlaubt die Anmeldung per Schlüssel statt per
+// Dienstkonto. v1 bleibt für ältere Installationen erreichbar.
 //
 // Beide Formen sind aus den Herstellermodulen übernommen, nicht geraten.
 //
@@ -23,6 +25,9 @@
 //                  { jobDefinitionId, endpointId, startIfAlreadyAssigned }
 //   Instanz start  POST /v2.0/JobInstances/{id}/Start
 //   Instanz Status GET  /v2.0/JobInstances/{id}
+//   Software       GET  /v2.0/WindowsEndpoints/{endpointId}/InstalledWindowsSoftware
+//                  (Bereich software; Feldnamen der Rückgabe sind im
+//                   Herstellermodul nicht modelliert, siehe execute())
 //   Listen antworten mit { data: [...] } (Select-bCPageData.ps1).
 //   Feldnamen in Kleinschreibung: id, displayName, state.
 //
@@ -36,7 +41,7 @@ const { URL } = require('url');
 const CONFIG = {
   server: process.env.BCONNECT_SERVER || '',
   port: process.env.BCONNECT_PORT || '443',
-  version: process.env.BCONNECT_VERSION || 'v1.0',
+  version: process.env.BCONNECT_VERSION || 'v2.0',
   user: process.env.BCONNECT_USER || '',
   password: process.env.BCONNECT_PASSWORD || '',
   // Nur v2 kennt Schlüssel. Er ist dem Dienstkonto vorzuziehen: ein Schlüssel
@@ -163,10 +168,24 @@ async function listJobs() {
 // Werkzeuge für die KI: ein Auflisten und ein Ausführen. Der `enum` sorgt dafür,
 // dass das Modell gar keinen anderen Jobnamen erzeugen kann.
 async function toolDefinitions() {
+  // Das Lesen der Softwareliste hängt nicht an der Job-Freigabeliste: die
+  // begrenzt, was ausgeführt werden darf. Wer keine Jobs freigibt, soll
+  // trotzdem sehen können, was auf einem Gerät installiert ist.
+  // Nur v2 kennt diesen Weg; in v1 müsste man dafür einen Job auslösen.
+  const softwareWerkzeug = istV2() && isConfigured()
+    ? [{
+        name: 'list_installed_software',
+        description:
+          'Listet die auf dem Gerät installierte Software mit Version. Liest nur, verändert nichts. Nutze das bei Fragen wie "welche Version habe ich" oder "ist das Programm überhaupt installiert".',
+        input_schema: { type: 'object', properties: {}, additionalProperties: false }
+      }]
+    : [];
+
   const jobs = await listJobs();
-  if (!jobs.length) return [];
+  if (!jobs.length) return softwareWerkzeug;
 
   return [
+    ...softwareWerkzeug,
     {
       name: 'list_bms_jobs',
       description:
@@ -190,7 +209,7 @@ async function toolDefinitions() {
   ];
 }
 
-const RISK = { list_bms_jobs: 'read', run_bms_job: 'write' };
+const RISK = { list_bms_jobs: 'read', list_installed_software: 'read', run_bms_job: 'write' };
 
 async function execute(deviceId, action, params = {}) {
   if (!isConfigured()) throw new Error('bConnect ist nicht konfiguriert.');
@@ -199,6 +218,26 @@ async function execute(deviceId, action, params = {}) {
     const jobs = await listJobs();
     return {
       output: jobs.map((j) => `${j.name}${j.comment ? ' — ' + j.comment : ''}`).join('\n') || '(keine freigegebenen Jobs)',
+      exitCode: 0
+    };
+  }
+
+  if (action === 'list_installed_software') {
+    if (!istV2()) throw new Error('Installierte Software lässt sich nur über bConnect v2 lesen.');
+    const eintraege = listeAus(
+      await v2('software', `/WindowsEndpoints/${encodeURIComponent(deviceId)}/InstalledWindowsSoftware`)
+    );
+    // Die Feldnamen der Rückgabe sind im Herstellermodul nicht modelliert —
+    // es ist ein reiner Lesepfad. Deshalb mehrere Kandidaten. Weicht eure
+    // Fassung ab, muss nur diese Zeile angepasst werden.
+    const zeilen = eintraege.map((e) => {
+      const name = e.displayName || e.name || e.productName || '(ohne Namen)';
+      const version = e.displayVersion || e.version || e.productVersion || '';
+      const hersteller = e.publisher || e.vendor || e.manufacturer || '';
+      return [name, version, hersteller && `(${hersteller})`].filter(Boolean).join(' ');
+    });
+    return {
+      output: zeilen.length ? zeilen.join('\n') : '(keine Software inventarisiert)',
       exitCode: 0
     };
   }

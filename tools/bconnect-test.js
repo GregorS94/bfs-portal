@@ -113,6 +113,30 @@ function fassung(version, { schluessel = false } = {}) {
       assert.match(ergebnis.output, /Instanz: inst-/);
     });
 
+    await check(`${name}: installierte Software — nur v2 kann das`, async () => {
+      const werkzeuge = await bconnect.toolDefinitions();
+      const hat = werkzeuge.some((w) => w.name === 'list_installed_software');
+      assert.strictEqual(hat, version.startsWith('v2'),
+        `list_installed_software ${hat ? 'da' : 'fehlt'} bei ${version}`);
+
+      if (!version.startsWith('v2')) {
+        await assert.rejects(
+          () => bconnect.execute('ep-0001', 'list_installed_software', {}),
+          /nur über bConnect v2/
+        );
+        return;
+      }
+
+      const ergebnis = await bconnect.execute('ep-0001', 'list_installed_software', {});
+      assert.strictEqual(ergebnis.exitCode, 0);
+      assert.match(ergebnis.output, /Google Chrome 141\.0\.7390\.55 \(Google LLC\)/);
+      assert.match(ergebnis.output, /7-Zip/);
+
+      // Ein Gerät ohne Inventar darf keine leere Zeile liefern, sondern einen Satz.
+      const leer = await bconnect.execute('ep-0002', 'list_installed_software', {});
+      assert.match(leer.output, /keine Software inventarisiert/);
+    });
+
     await check(`${name}: nicht freigegebener Job wird abgelehnt`, async () => {
       const geraete = await bconnect.listDevices();
       await assert.rejects(
@@ -142,15 +166,25 @@ function fassung(version, { schluessel = false } = {}) {
 
   console.log('\n--- fassungsübergreifend ---');
 
-  await check('leere Freigabeliste heißt: kein Werkzeug', async () => {
+  await check('leere Freigabeliste nimmt das Ausführen, nicht das Lesen', async () => {
     const merk = bconnect.CONFIG.allowedJobs;
     bconnect.CONFIG.allowedJobs = [];
+
+    // v2: die Softwareliste bleibt, run_bms_job verschwindet.
+    fassung('v2.0', { schluessel: true });
+    const werkzeugeV2 = await bconnect.toolDefinitions();
+    assert.deepStrictEqual(werkzeugeV2.map((w) => w.name), ['list_installed_software']);
+
+    // v1 kennt nur Jobs — dort bleibt gar nichts übrig.
+    fassung('v1.0');
     assert.deepStrictEqual(await bconnect.toolDefinitions(), []);
+
     await assert.rejects(
       () => bconnect.execute('ep-0001', 'run_bms_job', { jobName: 'gpupdate' }),
       /nicht freigegeben/
     );
     bconnect.CONFIG.allowedJobs = merk;
+    fassung('v2.0', { schluessel: true });
   });
 
   await check('ohne Konfiguration wird nicht geraten', async () => {

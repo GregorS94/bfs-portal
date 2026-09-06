@@ -118,7 +118,7 @@ Nur `.env`, nicht in der Oberfläche.
 |----------|---------|-----------|
 | `BCONNECT_SERVER` | — | Hostname des Management Centers |
 | `BCONNECT_PORT` | `443` | |
-| `BCONNECT_VERSION` | `v1.0` | `v1.0` oder `v2.0` — siehe unten |
+| `BCONNECT_VERSION` | `v2.0` | `v1.0` oder `v2.0` — siehe unten |
 | `BCONNECT_API_KEY` | — | nur v2; wird `BCONNECT_USER`/`PASSWORD` vorgezogen |
 | `BCONNECT_USER` | — | HTTP Basic |
 | `BCONNECT_PASSWORD` | — | HTTP Basic |
@@ -131,10 +131,16 @@ ausdrücklich steht, darf ausgelöst werden.
 
 ### Welche Fassung?
 
-`v2.0` nehmen, wenn die bMS sie kann. Sie erlaubt die Anmeldung per Schlüssel
-statt per Dienstkonto — ein Schlüssel lässt sich zurückziehen, ohne dass
-jemand ein Kennwort ändern muss — und benutzt gewöhnliche REST-Formen, während
-v1 eine JobInstance per `GET` anlegt.
+`v2.0` ist die Vorgabe: BFS fährt bMC 26.1, und v2 erlaubt die Anmeldung per
+Schlüssel statt per Dienstkonto — ein Schlüssel lässt sich zurückziehen, ohne
+dass jemand ein Kennwort ändern muss. Dazu benutzt v2 gewöhnliche REST-Formen,
+während v1 eine JobInstance per `GET` anlegt.
+
+Nur v2 kann die **installierte Software eines Geräts lesen**
+(`list_installed_software`). Dieses Werkzeug hängt bewusst **nicht** an
+`BCONNECT_ALLOWED_JOBS` — die Liste begrenzt, was ausgeführt werden darf, nicht
+was gelesen werden darf. `v1.0` bleibt für ältere Installationen erreichbar,
+dort fehlt das Werkzeug.
 
 Der Treiber spricht beide; welche, entscheidet allein `BCONNECT_VERSION`. Die
 Adressen und Feldnamen beider Fassungen stehen im Kopfkommentar von
