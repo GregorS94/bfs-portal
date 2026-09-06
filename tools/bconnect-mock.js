@@ -1,5 +1,7 @@
 // Nachbau der bConnect-Endpunkte, die der Treiber benutzt — nur zum Testen.
-// Spricht exakt die Request-Formen aus PS-bConnect nach.
+// Spricht beide Fassungen: v1 nach PS-bConnect, v2 nach dem Modul bConnectV2
+// (Pfade /bconnect/{bereich}/v2.0/…, Listen in `data`, Felder kleingeschrieben,
+// Anmeldung wahlweise per X-API-KEY).
 const https = require('https');
 const { execFileSync } = require('child_process');
 const fs = require('fs');
@@ -14,6 +16,7 @@ if (!fs.existsSync(`${DIR}/key.pem`)) {
 
 const USER = 'portal';
 const PASS = 'geheim';
+const APIKEY = 'schluessel-fuer-den-test';
 
 const ENDPOINTS = [
   { Id: 'ep-0001', HostName: 'PC-MUELLER', OS: 'Windows 11 24H2', LastContact: '2026-08-28T06:00:00Z' },
@@ -33,12 +36,20 @@ const server = https.createServer(
   { key: fs.readFileSync(`${DIR}/key.pem`), cert: fs.readFileSync(`${DIR}/cert.pem`) },
   (req, res) => {
     const auth = (req.headers.authorization || '').replace('Basic ', '');
-    if (Buffer.from(auth, 'base64').toString() !== `${USER}:${PASS}`) {
+    const basicOk = Buffer.from(auth, 'base64').toString() === `${USER}:${PASS}`;
+    const keyOk = req.headers['x-api-key'] === APIKEY;
+    if (!basicOk && !keyOk) {
       res.writeHead(401).end('unauthorized');
       return;
     }
 
     const url = new URL(req.url, 'https://x');
+
+    // --- v2 -------------------------------------------------------------
+    // Eigener Zweig, weil v2 echte Verben und Pfadsegmente benutzt statt
+    // alles in Abfrageparameter zu packen.
+    if (url.pathname.includes('/v2.0/')) return v2(req, res, url);
+
     const controller = url.pathname.split('/').pop();
     const q = Object.fromEntries(url.searchParams);
     const json = (obj) => res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(obj));
@@ -73,4 +84,76 @@ const server = https.createServer(
   }
 );
 
-server.listen(8443, '127.0.0.1', () => console.log('bConnect-Mock auf https://127.0.0.1:8443'));
+/** v2-Zweig. Felder klein, Listen in `data`, Instanz anlegen per POST. */
+function v2(req, res, url) {
+  const json = (obj, code = 200) =>
+    res.writeHead(code, { 'Content-Type': 'application/json' }).end(JSON.stringify(obj));
+  const teile = url.pathname.split('/v2.0/')[1].split('/').filter(Boolean);
+  const [ressource, id, befehl] = teile;
+
+  const klein = (o) => Object.fromEntries(
+    Object.entries(o).map(([k, v]) => [k[0].toLowerCase() + k.slice(1), v])
+  );
+
+  if (ressource === 'Endpoints' && !id) {
+    return json({ data: ENDPOINTS.map((e) => klein({ ...e, displayName: e.HostName })) });
+  }
+  if (ressource === 'JobDefinitions' && !id) {
+    return json({ data: JOBS.map((j) => klein({ ...j, displayName: j.Name })) });
+  }
+
+  if (ressource === 'JobInstances') {
+    if (!id && req.method === 'POST') {
+      return leseKoerper(req, (koerper) => {
+        if (!koerper?.jobDefinitionId || !koerper?.endpointId) {
+          return json({ message: 'jobDefinitionId und endpointId sind Pflicht' }, 400);
+        }
+        const neu = `inst-${++counter}`;
+        instances.set(neu, {
+          Id: neu,
+          EndpointId: koerper.endpointId,
+          JobId: koerper.jobDefinitionId,
+          State: 'Waiting'
+        });
+        return json({ id: neu, state: 'Waiting' }, 201);
+      });
+    }
+    const inst = instances.get(id);
+    if (!inst) return json({ message: 'unknown instance' }, 404);
+
+    if (befehl === 'Start' && req.method === 'POST') {
+      inst.State = 'Running';
+      return json({ id, state: inst.State });
+    }
+    if (!befehl && req.method === 'GET') {
+      inst.polls = (inst.polls || 0) + 1;
+      if (inst.polls >= 2) inst.State = 'Successful';
+      return json({ id, state: inst.State, endpointId: inst.EndpointId });
+    }
+  }
+
+  return json({ message: 'not found' }, 404);
+}
+
+function leseKoerper(req, weiter) {
+  let roh = '';
+  req.on('data', (c) => (roh += c));
+  req.on('end', () => {
+    try {
+      weiter(roh ? JSON.parse(roh) : null);
+    } catch {
+      weiter(null);
+    }
+  });
+}
+
+const PORT = Number(process.argv[2] || 8443);
+
+module.exports = { server, PORT, USER, PASS, APIKEY, ENDPOINTS, JOBS, instances };
+
+// Nur starten, wenn direkt aufgerufen — bconnect-test.js bindet die Attrappe
+// ein und startet sie selbst.
+if (require.main === module) {
+  server.listen(PORT, '127.0.0.1', () =>
+    console.log(`bConnect-Mock auf https://127.0.0.1:${PORT}`));
+}

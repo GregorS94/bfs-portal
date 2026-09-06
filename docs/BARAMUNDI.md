@@ -78,6 +78,12 @@ und so steht es auch in unserem Treiber. In v2 entfällt diese Kuriosität.
 **Was auch v2 nicht liefert:** keine Endpunkte für Plattenplatz, Speicher oder
 Dienstzustände. Die Live-Diagnose bleibt also beim PowerShell-Job.
 
+**Umgesetzt am 2026-09-06:** Der Treiber spricht jetzt beide Fassungen,
+`BCONNECT_VERSION` entscheidet. v2 nimmt `BCONNECT_API_KEY` und legt Instanzen
+per `POST` an; v1 bleibt unverändert. Geprüft mit `node tools/bconnect-test.js`
+(27 Prüfungen über v1, v2 mit Schlüssel und v2 mit Basic) — gegen die Attrappe,
+nicht gegen einen echten Server.
+
 ## Die Lücke zum eigenen Agenten
 
 Die Aktionen in `backend/actions.js` zerfallen in drei Gruppen:

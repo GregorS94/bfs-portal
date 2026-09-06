@@ -118,18 +118,35 @@ Nur `.env`, nicht in der Oberfläche.
 |----------|---------|-----------|
 | `BCONNECT_SERVER` | — | Hostname des Management Centers |
 | `BCONNECT_PORT` | `443` | |
-| `BCONNECT_VERSION` | `v1.0` | Pfadbestandteil der bConnect-Adresse |
+| `BCONNECT_VERSION` | `v1.0` | `v1.0` oder `v2.0` — siehe unten |
+| `BCONNECT_API_KEY` | — | nur v2; wird `BCONNECT_USER`/`PASSWORD` vorgezogen |
 | `BCONNECT_USER` | — | HTTP Basic |
 | `BCONNECT_PASSWORD` | — | HTTP Basic |
 | `BCONNECT_ALLOW_SELF_SIGNED` | `false` | für Testinstallationen |
+| `BCONNECT_POLL_MS` | `5000` | Abstand zwischen zwei Statusabfragen |
 | `BCONNECT_ALLOWED_JOBS` | leer | **ohne diese Liste ist nichts ausführbar** |
 
 Der bMS-Katalog enthält auch Rollouts und Compliance-Läufe. Nur was hier
 ausdrücklich steht, darf ausgelöst werden.
 
-Getestet gegen bMC **26.1.161.0**. Die Zustandsfelder einer JobInstance werden
-an genau einer Stelle ausgewertet: `interpretState()` in
-`backend/drivers/bconnect.js`.
+### Welche Fassung?
+
+`v2.0` nehmen, wenn die bMS sie kann. Sie erlaubt die Anmeldung per Schlüssel
+statt per Dienstkonto — ein Schlüssel lässt sich zurückziehen, ohne dass
+jemand ein Kennwort ändern muss — und benutzt gewöhnliche REST-Formen, während
+v1 eine JobInstance per `GET` anlegt.
+
+Der Treiber spricht beide; welche, entscheidet allein `BCONNECT_VERSION`. Die
+Adressen und Feldnamen beider Fassungen stehen im Kopfkommentar von
+`backend/drivers/bconnect.js`, die Abwägung samt offener Fragen an die IT in
+[`BARAMUNDI.md`](BARAMUNDI.md).
+
+Die Request-Formen sind aus den Herstellermodulen abgeleitet — v1 aus
+PS-bConnect, v2 aus bConnectV2 26.1.101, das zu bMC 26.1 gehört. **Gegen einen
+echten bMS-Server ist keine der beiden Fassungen gelaufen**, verifiziert sind
+sie nur gegen `tools/bconnect-mock.js` (`node tools/bconnect-test.js`, 27
+Prüfungen). Die Zustandsfelder einer JobInstance werden an genau einer Stelle
+ausgewertet: `interpretState()` in `backend/drivers/bconnect.js`.
 
 ## Geräte-Agent
 
