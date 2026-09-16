@@ -64,6 +64,31 @@ Netzmaske als Präfix: `/23` entspricht `255.255.254.0`, `/24` entspricht
 `255.255.255.0`. Bei falscher Angabe ist der Server aus Teilen des Netzes
 unerreichbar.
 
+**Steht der Server in einem anderen Netz als die Clients** — im aktuellen
+Aufbau `192.168.2.104` — dann mit dessen Werten und `/24`:
+
+```yaml
+network:
+  version: 2
+  ethernets:
+    ens18:
+      dhcp4: false
+      addresses: [192.168.2.104/24]
+      routes:
+        - to: default
+          via: 192.168.2.1
+      nameservers:
+        addresses: [192.168.2.1, 1.1.1.1]
+```
+
+Das ist unproblematisch, solange zwischen beiden Netzen geroutet wird — siehe
+Schritt 11. Die Adresse gehört zusätzlich im Router reserviert oder aus dem
+DHCP-Bereich genommen, sonst bekommt sie irgendwann ein zweites Gerät.
+
+Wer sich das Aussperr-Risiko ganz sparen will, macht statt netplan nur eine
+DHCP-Reservierung auf die MAC-Adresse. Für einen Server ist die feste
+Konfiguration sauberer, für einen Testaufbau reicht die Reservierung.
+
 **Zum Übernehmen `netplan try`, nicht `netplan apply`.** `try` macht die
 Änderung nach 120 Sekunden ohne Bestätigung von selbst rückgängig — wer sich
 per SSH aussperrt, kommt so wieder rein:
@@ -241,17 +266,31 @@ docker network inspect bfs-portal_default \
 | Backend | http://srv-ssp01:9001 |
 | Attrappen-API | http://srv-ssp01:9002 |
 
-## 10. Firewall
+## 10. Firewall auf dem Server (ufw)
 
 ```bash
+# SSH zuerst — und zwar aus JEDEM Netz, aus dem verwaltet wird
+sudo ufw allow from <192.168.2.0/24> to any port 22 proto tcp
 sudo ufw allow from <172.18.38.0/23> to any port 22 proto tcp
+
 sudo ufw allow from <172.18.38.0/23> to any port 9000 proto tcp
 sudo ufw allow from <172.18.38.0/23> to any port 9001 proto tcp
+
 sudo ufw enable
 sudo ufw status verbose
 ```
 
-SSH zuerst freigeben, sonst sperrt `ufw enable` die laufende Sitzung aus.
+**SSH zuerst freigeben, sonst sperrt `ufw enable` die laufende Sitzung aus.**
+Und zwar für das Netz, aus dem du gerade verbunden bist — steht der Server in
+`192.168.2.x` und gibst du nur das Clientnetz frei, fliegst du im selben Moment
+raus, in dem die Regel greift. Vor `ufw enable` also einmal prüfen:
+
+```bash
+who        # aus welcher Adresse kommt die eigene Sitzung?
+```
+
+Bleibt eine zweite Sitzung offen, während die erste die Regel setzt, ist der
+Weg zurück immer frei.
 
 Port 9002 bleibt zu — die Attrappen-API ist Testwerkzeug und hat im Clientnetz
 nichts verloren. Wer sie nicht braucht: `docker compose stop mock-api`.
@@ -262,7 +301,46 @@ ohnehin offen sein sollen, spielt das keine Rolle; soll ein Port wirklich dicht
 sein, gehört die Regel nach `DOCKER-USER` oder die Veröffentlichung wird auf
 `127.0.0.1:9000:80` eingeschränkt.
 
-## 11. Neustart überstehen
+## 11. Firewall dazwischen (Sophos)
+
+Stehen Server und Clients in verschiedenen Netzen, hängt eine Firewall
+dazwischen. Drei Punkte entscheiden darüber, ob das Portal sich richtig
+verhält oder nur fast.
+
+**Es wird nur eine Richtung gebraucht.** Der Geräte-Agent baut die Verbindung
+immer von sich aus zum Portal auf und hält sie per Long-Poll offen
+(`POLL_TIMEOUT = 40` in `agent/bfs-agent.py`, Serverfenster 25 s in
+`backend/jobs.js`). Das Portal verbindet sich nie von sich aus zu einem Client.
+
+```
+<Clientnetz>  ->  <Portal-IP>  :9001/tcp    Agent und API
+<Clientnetz>  ->  <Portal-IP>  :9000/tcp    Browser
+```
+
+Keine Regel in die Gegenrichtung. 9002 bleibt zu.
+
+**Kein Web-Proxy, keine TLS-Inspection auf diesen Regeln.** Das ist der Punkt,
+der sonst einen Tag Fehlersuche kostet. Die Chat-Antwort wird gestreamt —
+deshalb steht `proxy_buffering off` in der nginx-Konfiguration. Eine Firewall,
+die die Antwort erst vollständig einsammelt, bevor sie sie weiterreicht, macht
+daraus zehn Sekunden Stille und dann eine Wand aus Text. Das sieht nach einem
+Fehler im Portal aus und ist keiner. Dasselbe gilt für den Long-Poll: eine
+Verbindung, die 25 Sekunden offen steht, ohne ein einziges Byte zu senden,
+wirkt auf manche Scanner wie eine hängende Sitzung.
+
+Also als reine Layer-3/4-Regel anlegen.
+
+**TCP-Idle-Timeout über 40 Sekunden.** Die Vorgabe liegt deutlich darüber, aber
+ein angepasstes Regelwerk kann den Wert gesenkt haben. Liegt er unter 40, bricht
+jeder Long-Poll ab: der Agent meldet sich ständig neu, Aufträge kommen verzögert
+statt sofort an. Das Symptom ist Trägheit, nicht Ausfall — entsprechend leicht
+wird es der Anwendung angelastet.
+
+Ausgehend braucht der Server nur HTTPS zu `api.anthropic.com`, später Atlassian
+und Microsoft Graph. Auch die Anthropic-Antwort streamt; dieselbe Vorsicht mit
+der Inspection.
+
+## 12. Neustart überstehen
 
 Die Container tragen `restart: unless-stopped`, kommen also von allein wieder.
 Einmal beweisen:
@@ -273,7 +351,7 @@ sudo reboot
 docker compose -f /opt/bfs-portal/docker-compose.yml ps
 ```
 
-## 12. Danach
+## 13. Danach
 
 - **TLS davor.** 9000 spricht nur HTTP. Produktiv gehört ein Reverse Proxy mit
   Zertifikat davor; `proxy_buffering off` ist dabei Pflicht, sonst kommt die
@@ -308,3 +386,5 @@ docker compose -f /opt/bfs-portal/docker-compose.yml ps
 | Chat scheitert, Portal läuft | `ANTHROPIC_API_KEY` fehlt oder der Server kommt nicht an `api.anthropic.com`. |
 | Nach Neustart ist die IP wieder per DHCP | cloud-init aus Schritt 2 nicht abgeschaltet. |
 | `git pull` scheitert mit Rechtefehler | Stack einmal mit `sudo` gebaut. `sudo chown -R $USER:docker /opt/bfs-portal`. |
+| Chat antwortet erst nach langer Stille, dann alles auf einmal | TLS-Inspection oder Web-Proxy auf der Firewall puffert den Strom. Schritt 11. |
+| Agent meldet sich ständig neu an, Aufträge kommen verzögert | TCP-Idle-Timeout der Firewall unter 40 Sekunden. Schritt 11. |
