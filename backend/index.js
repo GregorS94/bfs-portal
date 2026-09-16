@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const express = require('express');
 const cors = require('cors');
 const Anthropic = require('@anthropic-ai/sdk');
@@ -62,9 +63,21 @@ function bearer(req) {
   return header.startsWith('Bearer ') ? header.slice(7) : '';
 }
 
+/**
+ * Laufzeitkonstanter Vergleich zweier Geheimnisse — wie in `agents.js` und
+ * `simple-auth.js`. Sonst verrät die Dauer, wie viele Zeichen stimmen.
+ */
+function sameSecret(a, b) {
+  const left = Buffer.from(String(a || ''));
+  const right = Buffer.from(String(b || ''));
+  // Laengenvergleich zuerst: timingSafeEqual wirft bei ungleicher Laenge.
+  if (left.length === 0 || left.length !== right.length) return false;
+  return crypto.timingSafeEqual(left, right);
+}
+
 /** Das gemeinsame Geheimnis aus der `.env` — gilt nur noch fürs Anmelden. */
 function requireEnrollToken(req, res, next) {
-  if (!AGENT_TOKEN || bearer(req) !== AGENT_TOKEN) {
+  if (!AGENT_TOKEN || !sameSecret(bearer(req), AGENT_TOKEN)) {
     return res.status(401).json({ error: 'Anmelde-Token ungültig.' });
   }
   next();
@@ -538,6 +551,11 @@ app.post('/api/support/chat', auth.requireUser, async (req, res) => {
   if (typeof message !== 'string' || !message.trim()) {
     return res.status(400).json({ error: 'Feld "message" fehlt oder ist leer.' });
   }
+  // Ungeprueft weitergereicht riss `history` den ganzen Prozess mit: ein Fehler
+  // in einem `async`-Handler wird von Express 4 nicht gefangen.
+  if (!Array.isArray(history)) {
+    return res.status(400).json({ error: 'Feld "history" muss eine Liste sein.' });
+  }
 
   const priorTurns = history
     .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
@@ -907,6 +925,21 @@ function runPrune() {
     console.error('Audit-Log konnte nicht bereinigt werden:', err.message);
   }
 }
+
+// Netz gegen Abstuerze. Beides zusammen, weil beide Wege vorkommen: Express 4
+// reicht Fehler aus synchronen Handlern an diese Middleware weiter, faengt aber
+// zurueckgewiesene Zusagen aus `async`-Handlern nicht — die landeten bisher als
+// unbehandelte Zurueckweisung und beendeten den Prozess. Ein einziger krummer
+// Aufruf legte damit den Support fuer alle lahm.
+app.use((err, req, res, _next) => {
+  console.error('⚠️  Fehler in der Anfrage:', err);
+  if (res.headersSent) return;
+  res.status(500).json({ error: 'Interner Fehler.' });
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('⚠️  Unbehandelte Zurückweisung:', reason);
+});
 
 const PORT = Number(process.env.PORT) || 3000;
 app.listen(PORT, '0.0.0.0', () => {
