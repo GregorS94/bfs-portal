@@ -10,6 +10,11 @@
 Entwickelt und betrieben auf einem Raspberry Pi 5 (8 GB). Die Images bauen
 unter arm64 und amd64 gleichermaßen.
 
+Für eine frische Ubuntu-Server-VM — von der leeren Maschine über feste IP und
+Docker-Installation bis zum laufenden Stack — gibt es die durchgehende
+Schrittfolge in [`INSTALL_UBUNTU.md`](INSTALL_UBUNTU.md). Dieses Dokument hier
+setzt einen Host mit fertigem Docker voraus.
+
 ## Docker-Adressbereiche — vor dem ersten Start
 
 **Das ist keine Feinheit, sondern eine Voraussetzung.** Docker vergibt seinen
