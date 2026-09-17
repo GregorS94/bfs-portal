@@ -178,6 +178,7 @@ ob etwas gesetzt ist.
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Komponenten, Datenfluss, Zustände eines Auftrags |
 | [`docs/SECURITY.md`](docs/SECURITY.md) | Freigabemodell, Bedrohungsmodell, bewusste Grenzen |
 | [`docs/SETUP.md`](docs/SETUP.md) | Installation von null, Geräte-Agent, Entwicklungsmodus |
+| [`docs/INSTALL_UBUNTU.md`](docs/INSTALL_UBUNTU.md) | Frische Ubuntu-Server-VM: feste IP, Docker, Firewall |
 | [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) | Alle Umgebungsvariablen und Oberflächen-Einstellungen |
 | [`docs/API.md`](docs/API.md) | Alle 23 Endpunkte mit Rollen |
 | [`docs/OPERATIONS.md`](docs/OPERATIONS.md) | Tests, Attrappen, Statusprüfung, bekannte Fallstricke |
@@ -185,6 +186,8 @@ ob etwas gesetzt ist.
 | [`docs/PROZESSE.md`](docs/PROZESSE.md) | Prozesse und aufsichtsrechtliche Einordnung (DORA, MaRisk, DSGVO, AI Act) |
 | [`docs/SPIELWIESE.md`](docs/SPIELWIESE.md) | Was eine Testumgebung enthalten müsste — zum Weitergeben |
 | [`docs/STATUS.md`](docs/STATUS.md) | Was verifiziert ist, was offen ist |
+| [`docs/FAHRPLAN.md`](docs/FAHRPLAN.md) | Was in welcher Reihenfolge zu tun ist, und wer dafür gebraucht wird |
+| [`docs/BARAMUNDI.md`](docs/BARAMUNDI.md) | bConnect: was geht, was nicht, und warum zurückgestellt |
 
 ## Tests
 

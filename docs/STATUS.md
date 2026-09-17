@@ -1,6 +1,6 @@
 # Stand
 
-Letzte Aktualisierung: 2026-08-30.
+Letzte Aktualisierung: 2026-09-17. Fahrplan: [`FAHRPLAN.md`](FAHRPLAN.md).
 
 Prototyp und Entwicklungsumgebung, nichts Produktives. Hochverfügbarkeit,
 Alarmierung und Backups sind bewusst kein Ziel. Fernziel ist ein
@@ -90,11 +90,15 @@ Seitenkörper nachgeladen und aus dem XHTML Fließtext gemacht.
    IT-Bereich, der aus einer Anfrage den Auftrag macht. Erst damit läuft die
    Vier-Augen-Freigabe im laufenden Portal statt nur im Test.
 3. **bConnect am echten Server prüfen.** Verifiziert ist nur gegen die
-   Attrappe — inzwischen in beiden Fassungen (`node tools/bconnect-test.js`,
-   27 Prüfungen). Offen sind die Feldnamen der JobInstance-Zustände
-   (`interpretState()`), ob ein bMS-Job Rohausgabe liefert oder nur Status und
-   ob eure bMS überhaupt v2 kann. Fragen an die IT und die Folgen für den
-   eigenen Agenten stehen in [`docs/BARAMUNDI.md`](BARAMUNDI.md).
+   Attrappe, inzwischen in beiden Fassungen (`node tools/bconnect-test.js`,
+   37 Prüfungen). Die Schnittstellenfragen sind seit 2026-09-17 beantwortet —
+   die Beschreibungen für bMS 26R1 liegen öffentlich vor: v2 läuft, alle drei
+   Anmeldeverfahren werden angeboten, die Job-Zustände stehen jetzt wörtlich im
+   Treiber, und eine JobInstance liefert **keine Rohausgabe**. Damit kann
+   bConnect die Diagnosegruppe nicht übernehmen. Einzelheiten in
+   [`docs/BARAMUNDI.md`](BARAMUNDI.md). Offen bleibt allein der erste Lauf
+   gegen den echten Server — und der ist zurückgestellt, siehe
+   [`FAHRPLAN.md`](FAHRPLAN.md).
 4. **Software-Tab ist eine Attrappe.**
 5. **Freigabe eines fremden Auftrags als `user`** ist am laufenden System
    ungeprüft — dafür braucht es zwei echte Identitäten. Die Regel selbst ist
