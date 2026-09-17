@@ -141,13 +141,79 @@ geschickt. Damit ist einiges nicht mehr Vermutung:
 - PATCH-Operationen arbeiten mit `JsonPatchDocument`, brauchen also den
   Patch-Content-Type. Der Treiber schickt heute kein PATCH.
 
-**Der interessanteste Fund ist der Kontext `Active Directory`.** Kann bConnect
-Konten entsperren und Passwörter setzen, dann ist die dritte Aktionsgruppe ohne
-einen einzigen Agenten erreichbar — und Stufe 1 bräuchte gar keinen Agenten
-mehr. Das steht und fällt mit `bConnect_ActiveDirectory.json`; die Datei liegt
-noch nicht vor, und ohne sie ist das eine Hoffnung, keine Aussage.
-
 Der konkrete Hostname steht bewusst nicht hier, sondern gehört in die `.env`.
+
+## Die Schnittstellenbeschreibungen — und was sie beantworten
+
+baramundi veröffentlicht unter
+[bConnect-MCP](https://github.com/baramundisoftware/bConnect-MCP) MCP-Server für
+die Schnittstelle. Unabhängig davon, ob man die einsetzen will: das Repository
+enthält unter `openapi-specs/26R1/` **alle zwölf Schnittstellenbeschreibungen
+für genau die Fassung, die bei BFS läuft**. Damit sind die drei Fragen
+beantwortet, die hier monatelang offen standen — ohne Zugriff auf den Server
+und ohne einen einzigen Job auszulösen.
+
+### 1. Der Kontext `Active Directory` ist rein lesend
+
+Sechzehn Endpunkte, **ausschließlich `GET`**: `ADUsers`, `ADGroups`,
+`ADObjects`, `OrgUnits` und ihre Verschachtelungen. Kein `Unlock`, kein
+Passwort, kein Schreibvorgang.
+
+Auch lesend hilft er nicht weiter: das Schema `ADUser` führt `id`, `name`,
+`sid`, `domain`, `ldapPath`, `mail`, `principalName`, Vor- und Nachname sowie
+den Vorgesetzten — **aber weder Sperrzustand noch Passwortablauf noch letzte
+Anmeldung**. Es ist eine Spiegelung der Stammdaten aus dem Inventarlauf, keine
+Kontoverwaltung.
+
+**Folge:** `get_ad_account_status`, `unlock_ad_account` und `reset_ad_password`
+bleiben beim eigenen Agenten. Ein Agent auf einem Domänenrechner mit RSAT ist
+dafür weiterhin nötig.
+
+### 2. Eine JobInstance liefert keine Rohausgabe
+
+`JobInstance` führt `state`, `stateDescription` und `steps[]` — jeder Schritt
+wieder mit `type`, `description`, `state`, `stateDescription`. **Kein
+stdout-Feld, keine Ausgabe des ausgeführten Skripts.**
+
+Damit ist die Frage entschieden, ob Diagnose über bConnect-Jobs taugt: **sie
+taugt nicht.** Man erfährt, *dass* ein Job erfolgreich war, nie *was er
+gemessen hat*. Auf „wie voll ist die Platte" antwortet bConnect
+„FinishedSuccessfully". bConnect kann den Agenten für die Diagnosegruppe nicht
+ersetzen — das ist keine Einschätzung mehr, sondern steht im Schema.
+
+### 3. Die Zustände sind jetzt bekannt — und deckten einen Fehler auf
+
+Das Schema `State` führt sechzehn Werte:
+
+    Queued, Running, FinishedSuccessfully, FinishedWithError, Cancelled,
+    Rescheduled, RescheduledWithError, WaitingForUser, RequirementsNotMet,
+    Downloading, SkippedDueToIncompatibility, Delayed, Assigned, Canceling,
+    MaintenanceWindow, WaitingForDevice
+
+`interpretState()` hat sie bis 2026-09-17 über Teilstrings geraten, und dabei
+zuerst auf Erfolg geprüft. **`FinishedWithError` enthält `finished` — ein
+fehlgeschlagener Job wurde damit als Erfolg gemeldet**, mit `exitCode 0`, an
+einen Support-Mitarbeiter, der sich darauf verlässt. Dazu liefen
+`RequirementsNotMet` und `SkippedDueToIncompatibility` in die volle
+Zehn-Minuten-Frist, obwohl in beiden Fällen von vornherein nichts mehr
+passiert.
+
+Der Treiber vergleicht die v2-Zustände jetzt wörtlich. Für v1, dessen Namen
+weiterhin nicht vorliegen, bleibt die Näherung — aber sie prüft Fehler vor
+Erfolg.
+
+**Und die Attrappe hat den Fehler gedeckt.** `tools/bconnect-mock.js` sprach
+von `Waiting` und `Successful` — Namen, die es in bConnect nicht gibt. Sie hat
+damit bestätigt, was der Treiber ohnehin annahm. Die Attrappe spricht jetzt die
+echten Zustände; `tools/bconnect-test.js` prüft alle sechzehn einzeln
+(37 Prüfungen).
+
+### Bleibt offen
+
+Wie mit `Rescheduled`, `WaitingForUser`, `MaintenanceWindow` und `Delayed`
+umzugehen ist. Der Treiber wartet dort bis zur Frist, wie bisher. Sinnvoller
+wäre vermutlich, sie sofort als „kommt in diesem Gespräch nicht mehr" zu
+melden — das ist aber eine Produktentscheidung, keine technische.
 
 ## Die Lücke zum eigenen Agenten
 
@@ -211,9 +277,14 @@ Gerät.
 
 ## Der MCP-Server
 
-baramundi bietet inzwischen einen MCP-Server an, also eine fertige Anbindung
-für Sprachmodelle. Das ist **nicht angebunden** und sollte es vorerst auch
-nicht werden. Die Regel aus `AGENTS.md` — Befehle entstehen im Backend, nie im
+baramundi bietet inzwischen MCP-Server an, also eine fertige Anbindung für
+Sprachmodelle: [bConnect-MCP](https://github.com/baramundisoftware/bConnect-MCP),
+zwölf Server mit zusammen 212 Werkzeugen. Das ist **nicht angebunden** und
+sollte es vorerst auch nicht werden.
+
+(Als *Quelle* ist das Repository trotzdem wertvoll — die
+Schnittstellenbeschreibungen darin haben oben drei offene Fragen beantwortet.
+Das eine hat mit dem anderen nichts zu tun.) Die Regel aus `AGENTS.md` — Befehle entstehen im Backend, nie im
 Modell — würde dadurch aufweichen: ein MCP-Server reicht dem Modell Werkzeuge
 direkt, an unserer Freigabeliste und am Audit-Log vorbei. Wenn überhaupt, dann
 so eingebunden, dass schreibende Aufrufe weiterhin durch `createJob()` und die
@@ -226,10 +297,11 @@ Freigabe laufen.
    steht auf `v2.0`.
 2. ~~Welche **Anmeldeverfahren** nimmt die Instanz an?~~ **Beantwortet:**
    Windows, Basic und API Key. Der API-Schlüssel ist der Weg.
-3. Liefert eine JobInstance **Rohausgabe** oder nur einen Status? Das
-   entscheidet, ob Diagnose über Jobs überhaupt taugt. Steht im Schema.
-4. Wie heißen die Endzustände einer JobInstance? `interpretState()` rät
-   derzeit anhand von Teilstrings. Steht im Schema.
+3. ~~Liefert eine JobInstance **Rohausgabe** oder nur einen Status?~~
+   **Beantwortet:** nur Status. Keine Rohausgabe. Diagnose über Jobs taugt
+   nicht.
+4. ~~Wie heißen die Endzustände einer JobInstance?~~ **Beantwortet:** sechzehn
+   Werte, im Treiber hinterlegt.
 4. Wie oft läuft die **Inventarisierung**? Das entscheidet über Weg 1 oben.
 5. Darf das Portal Jobs **auslösen** oder nur lesen?
 6. Wer legt den API-Benutzer an, mit welchen Rechten?

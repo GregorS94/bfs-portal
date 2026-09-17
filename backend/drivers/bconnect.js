@@ -136,16 +136,50 @@ const asArray = (x) => (Array.isArray(x) ? x : x ? [x] : []);
 // v2 verpackt Listen in ein Seitenobjekt, v1 liefert das Feld nackt.
 const listeAus = (antwort) => asArray(antwort?.data ?? antwort);
 
-// Einzige Stelle, an der bConnect-Feldnamen interpretiert werden. Weichen sie
-// bei eurer Version ab, muss nur hier etwas angepasst werden.
-const TERMINAL_OK = ['successful', 'success', 'completed', 'finished', 'ok', 'done'];
+// Einzige Stelle, an der bConnect-Feldnamen interpretiert werden.
+//
+// Die v2-Zustände stehen wörtlich in der Schnittstellenbeschreibung
+// (`bConnect_Jobs.json`, Schema `State`, bMS 26R1) — sie werden nicht mehr
+// geraten. Vollständige Liste: Queued, Running, FinishedSuccessfully,
+// FinishedWithError, Cancelled, Rescheduled, RescheduledWithError,
+// WaitingForUser, RequirementsNotMet, Downloading, SkippedDueToIncompatibility,
+// Delayed, Assigned, Canceling, MaintenanceWindow, WaitingForDevice.
+const V2_ERFOLG = new Set(['finishedsuccessfully']);
+
+// Endzustände, die keinen Erfolg bedeuten. `requirementsnotmet` und
+// `skippedduetoincompatibility` gehören ausdrücklich dazu: der Job läuft nicht
+// mehr an, Warten hätte nur die volle Frist verbraucht.
+const V2_FEHLER = new Set([
+  'finishedwitherror',
+  'cancelled',
+  'rescheduledwitherror',
+  'requirementsnotmet',
+  'skippedduetoincompatibility'
+]);
+
+// Für v1, dessen Zustandsnamen nicht dokumentiert vorliegen, bleibt die
+// Näherung über Teilstrings. Hier wird bewusst **zuerst auf Fehler geprüft**:
+// "FinishedWithError" enthält sowohl "finished" als auch "error", und in der
+// umgekehrten Reihenfolge wäre ein fehlgeschlagener Job als Erfolg gemeldet
+// worden.
 const TERMINAL_FAIL = ['error', 'failed', 'aborted', 'cancelled', 'canceled', 'timeout'];
+const TERMINAL_OK = ['successful', 'success', 'completed', 'finished', 'ok', 'done'];
 
 function interpretState(instance) {
   const raw = String(instance?.State ?? instance?.Status ?? instance?.state ?? '').toLowerCase();
-  if (TERMINAL_OK.some((s) => raw.includes(s))) return { done: true, ok: true, raw };
-  if (TERMINAL_FAIL.some((s) => raw.includes(s))) return { done: true, ok: false, raw };
-  return { done: false, ok: false, raw };
+  // Die einzige Zusatzinformation, die eine JobInstance zum Zustand mitliefert.
+  // Eine Rohausgabe des Jobs gibt es nicht — siehe docs/BARAMUNDI.md.
+  const beschreibung = instance?.stateDescription ?? instance?.StateDescription ?? '';
+
+  if (istV2()) {
+    if (V2_ERFOLG.has(raw)) return { done: true, ok: true, raw, beschreibung };
+    if (V2_FEHLER.has(raw)) return { done: true, ok: false, raw, beschreibung };
+    return { done: false, ok: false, raw, beschreibung };
+  }
+
+  if (TERMINAL_FAIL.some((s) => raw.includes(s))) return { done: true, ok: false, raw, beschreibung };
+  if (TERMINAL_OK.some((s) => raw.includes(s))) return { done: true, ok: true, raw, beschreibung };
+  return { done: false, ok: false, raw, beschreibung };
 }
 
 // Ab hier stehen die Feldnamen beider Fassungen nebeneinander: v1 schreibt sie
@@ -304,9 +338,7 @@ async function execute(deviceId, action, params = {}) {
       return {
         output:
           `Job "${job.name}" auf dem Gerät: ${last?.State ?? last?.state ?? state.raw}\n` +
-          (last?.ErrorMessage || last?.errorMessage
-            ? `Meldung: ${last.ErrorMessage || last.errorMessage}\n`
-            : '') +
+          (state.beschreibung ? `Meldung: ${state.beschreibung}\n` : '') +
           `Instanz: ${instanceId}`,
         exitCode: state.ok ? 0 : 1,
         error: state.ok ? null : `Job endete mit Status "${state.raw}".`
@@ -321,4 +353,16 @@ async function execute(deviceId, action, params = {}) {
   };
 }
 
-module.exports = { name: 'bconnect', isConfigured, listDevices, listJobs, toolDefinitions, execute, RISK, CONFIG };
+// interpretState wird mit ausgegeben, damit die Zustandstabelle einzeln
+// prüfbar ist, ohne für jeden der sechzehn Zustände einen Lauf zu bauen.
+module.exports = {
+  name: 'bconnect',
+  isConfigured,
+  listDevices,
+  listJobs,
+  toolDefinitions,
+  execute,
+  interpretState,
+  RISK,
+  CONFIG
+};

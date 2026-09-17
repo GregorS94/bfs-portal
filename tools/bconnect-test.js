@@ -209,6 +209,65 @@ function fassung(version, { schluessel = false } = {}) {
     Object.assign(bconnect.CONFIG, { user: merk.user, password: merk.pass, apiKey: merk.key });
   });
 
+  // --- Zustände einer JobInstance -----------------------------------------
+  // Die Namen stammen wörtlich aus bConnect_Jobs.json (Schema `State`, bMS
+  // 26R1). Vorher hat der Treiber sie über Teilstrings geraten, und
+  // "FinishedWithError" wurde dabei als Erfolg gemeldet — ein
+  // fehlgeschlagener Job meldete dem Support "erledigt".
+  await check('v2: FinishedSuccessfully ist der einzige Erfolg', () => {
+    fassung('v2.0', { schluessel: true });
+    const r = bconnect.interpretState({ state: 'FinishedSuccessfully' });
+    assert.deepStrictEqual({ done: r.done, ok: r.ok }, { done: true, ok: true });
+  });
+
+  await check('v2: FinishedWithError gilt NICHT als Erfolg', () => {
+    fassung('v2.0', { schluessel: true });
+    const r = bconnect.interpretState({ state: 'FinishedWithError' });
+    assert.deepStrictEqual({ done: r.done, ok: r.ok }, { done: true, ok: false });
+  });
+
+  await check('v2: die übrigen Fehlzustände enden und melden Misserfolg', () => {
+    fassung('v2.0', { schluessel: true });
+    for (const z of ['Cancelled', 'RescheduledWithError', 'RequirementsNotMet',
+      'SkippedDueToIncompatibility']) {
+      const r = bconnect.interpretState({ state: z });
+      assert.deepStrictEqual({ done: r.done, ok: r.ok }, { done: true, ok: false }, z);
+    }
+  });
+
+  await check('v2: Zwischenzustände beenden das Warten nicht', () => {
+    fassung('v2.0', { schluessel: true });
+    for (const z of ['Queued', 'Running', 'Assigned', 'Downloading', 'Delayed',
+      'Canceling', 'MaintenanceWindow', 'WaitingForUser', 'WaitingForDevice',
+      'Rescheduled']) {
+      assert.strictEqual(bconnect.interpretState({ state: z }).done, false, z);
+    }
+  });
+
+  await check('v2: stateDescription wird mitgenommen', () => {
+    fassung('v2.0', { schluessel: true });
+    const r = bconnect.interpretState({ state: 'FinishedWithError', stateDescription: 'Schritt 2 fehlgeschlagen.' });
+    assert.strictEqual(r.beschreibung, 'Schritt 2 fehlgeschlagen.');
+  });
+
+  await check('v1: Näherung prüft Fehler vor Erfolg', () => {
+    fassung('v1.0');
+    // Enthält "finished" UND "error". In der alten Reihenfolge war das ein Erfolg.
+    const r = bconnect.interpretState({ State: 'FinishedWithError' });
+    assert.deepStrictEqual({ done: r.done, ok: r.ok }, { done: true, ok: false });
+    assert.strictEqual(bconnect.interpretState({ State: 'Successful' }).ok, true);
+  });
+
+  await check('v2: ein Job, der mit Fehler endet, meldet exitCode 1', async () => {
+    fassung('v2.0', { schluessel: true });
+    const merk = mock.ENDZUSTAND.wert;
+    mock.ENDZUSTAND.wert = 'FinishedWithError';
+    const r = await bconnect.execute('ep-0001', 'run_bms_job', { jobName: 'gpupdate' });
+    mock.ENDZUSTAND.wert = merk;
+    assert.strictEqual(r.exitCode, 1);
+    assert.match(r.output, /Schritt 2 fehlgeschlagen\./);
+  });
+
   mock.server.close();
   fs.rmSync(DATA_DIR, { recursive: true, force: true });
   console.log(`\n${passed} Prüfungen bestanden${process.exitCode ? ' — mit Fehlern' : ''}.`);

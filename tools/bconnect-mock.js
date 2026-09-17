@@ -120,13 +120,17 @@ function v2(req, res, url) {
           return json({ message: 'jobDefinitionId und endpointId sind Pflicht' }, 400);
         }
         const neu = `inst-${++counter}`;
+        // Die Zustandsnamen stammen aus bConnect_Jobs.json (Schema `State`,
+        // bMS 26R1). Vorher standen hier erfundene Namen wie "Waiting" und
+        // "Successful" — damit hat die Attrappe die Ratelogik des Treibers
+        // bestätigt, statt sie zu prüfen.
         instances.set(neu, {
           Id: neu,
           EndpointId: koerper.endpointId,
           JobId: koerper.jobDefinitionId,
-          State: 'Waiting'
+          State: 'Assigned'
         });
-        return json({ id: neu, state: 'Waiting' }, 201);
+        return json({ id: neu, state: 'Assigned' }, 201);
       });
     }
     const inst = instances.get(id);
@@ -138,13 +142,22 @@ function v2(req, res, url) {
     }
     if (!befehl && req.method === 'GET') {
       inst.polls = (inst.polls || 0) + 1;
-      if (inst.polls >= 2) inst.State = 'Successful';
-      return json({ id, state: inst.State, endpointId: inst.EndpointId });
+      if (inst.polls >= 2) inst.State = ENDZUSTAND.wert;
+      return json({
+        id,
+        state: inst.State,
+        stateDescription: inst.State === 'FinishedWithError' ? 'Schritt 2 fehlgeschlagen.' : '',
+        endpointId: inst.EndpointId
+      });
     }
   }
 
   return json({ message: 'not found' }, 404);
 }
+
+// Womit ein Lauf in v2 endet. Der Test stellt das um, damit auch der
+// Fehlerweg einmal wirklich durchlaeuft.
+const ENDZUSTAND = { wert: 'FinishedSuccessfully' };
 
 function leseKoerper(req, weiter) {
   let roh = '';
@@ -160,7 +173,7 @@ function leseKoerper(req, weiter) {
 
 const PORT = Number(process.argv[2] || 8443);
 
-module.exports = { server, PORT, USER, PASS, APIKEY, ENDPOINTS, JOBS, SOFTWARE, instances };
+module.exports = { server, PORT, USER, PASS, APIKEY, ENDPOINTS, JOBS, SOFTWARE, instances, ENDZUSTAND };
 
 // Nur starten, wenn direkt aufgerufen — bconnect-test.js bindet die Attrappe
 // ein und startet sie selbst.
