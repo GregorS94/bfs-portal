@@ -91,6 +91,42 @@ Server. Die Feldnamen der Softwareliste sind im Herstellermodul nicht
 modelliert; der Treiber fragt mehrere Kandidaten ab und muss am echten Server
 nachgeschärft werden.
 
+## Was die Herstellerdokumentation klärt (Stand 2026-09-17)
+
+Aus der bMC-Hilfe, Konfiguration → Schnittstellen → bConnect:
+
+- **v2 ab bMS 2023 R1**, und sie braucht **keine eigene Konfiguration**. Sie ist
+  da, sobald bConnect überhaupt aktiv ist. Damit ist die erste offene Frage
+  beantwortet: BFS fährt bMC 26.1, v2 ist vorhanden.
+- **Aktivieren im bMC** unter *Konfiguration → Schnittstellen*, dort bConnect auf
+  *aktiv*.
+- **Es gibt eine OpenAPI-Dokumentationsseite im Browser:**
+  `https://<Server-FQDN>/bconnect/docs/`, erreichbar auch über *Öffnen* in
+  derselben Maske. Pro Kontext liegt dort eine maschinenlesbare
+  Schnittstellenbeschreibung.
+- Was v1 angeht, liegt die ausführliche Fassung als PDF im Installationspfad
+  unter `<Pfad zur bMS>\baramundi\Documentation\API`.
+- Die Struktur heißt herstellerseitig **Kontext**, nicht Bereich — inhaltlich
+  dasselbe wie der `{bereich}` in unseren Pfaden.
+- **Content-Type mit Zeichensatz.** Die Dokumentation verlangt ausdrücklich
+  `charset=utf-8` bei POST, sonst kommen Sonderzeichen falsch an. Der Treiber
+  setzt das seit 2026-09-17; vorher stand dort nur `application/json`.
+
+**Diese Doku-Seite ist der kürzeste Weg zu den offenen Fragen.** Zustandsnamen
+einer JobInstance und Feldnamen der Softwareliste stehen im Schema — sie müssen
+nicht am laufenden System erraten werden. Die Beschreibung für den Kontext
+`jobs` herunterladen und gegen `interpretState()` legen, dann ist Punkt 3 der
+Fragenliste erledigt, ohne einen einzigen Job auszulösen.
+
+**Offen bleibt die Anmeldung.** Die Hilfe verweist für v2 auf
+[KB16874 — Windows-Authentifizierung mit bConnect v2 und Kiosk](https://feedback.baramundi.de/de/knowledge-base/article/kb16874-de)
+(hinter Anmeldung, nicht gelesen). Sollte die Instanz auf Windows-Authentifizierung
+stehen, greift weder `X-API-KEY` noch Basic, und der Treiber bräuchte
+Kerberos/NTLM — das kann er heute nicht. Welche Verfahren die Instanz annimmt,
+zeigt die Doku-Seite unter `/bconnect/docs/`. **Das ist vor allem anderen zu
+klären**, denn daran hängt, ob der Treiber überhaupt in der heutigen Form
+funktioniert.
+
 ## Die Lücke zum eigenen Agenten
 
 Die Aktionen in `backend/actions.js` zerfallen in drei Gruppen:
@@ -145,13 +181,16 @@ Freigabe laufen.
 
 ## Offene Fragen an die IT
 
-1. Welche bMS-Version läuft — und ist **bConnect v2** darin enthalten? Davon
-   hängt ab, ob der Treiber auf `v2.0` und den API-Schlüssel umgestellt werden
-   kann (er steht heute auf `v1.0` mit Basic-Auth).
-2. Liefert eine JobInstance **Rohausgabe** oder nur einen Status? Das
-   entscheidet, ob Diagnose über Jobs überhaupt taugt.
-3. Wie heißen die Endzustände einer JobInstance? `interpretState()` rät
-   derzeit anhand von Teilstrings.
+1. ~~Ist **bConnect v2** in der laufenden bMS-Version enthalten?~~
+   **Beantwortet:** ja, ab 2023 R1 und ohne eigene Konfiguration. Der Treiber
+   steht auf `v2.0`.
+2. Welche **Anmeldeverfahren** nimmt die Instanz an — API-Schlüssel, Basic oder
+   Windows-Authentifizierung? Steht unter `/bconnect/docs/`. Bei reiner
+   Windows-Authentifizierung passt der Treiber heute nicht.
+3. Liefert eine JobInstance **Rohausgabe** oder nur einen Status? Das
+   entscheidet, ob Diagnose über Jobs überhaupt taugt. Steht im Schema.
+4. Wie heißen die Endzustände einer JobInstance? `interpretState()` rät
+   derzeit anhand von Teilstrings. Steht im Schema.
 4. Wie oft läuft die **Inventarisierung**? Das entscheidet über Weg 1 oben.
 5. Darf das Portal Jobs **auslösen** oder nur lesen?
 6. Wer legt den API-Benutzer an, mit welchen Rechten?
@@ -161,6 +200,13 @@ Freigabe laufen.
 
 ## Empfehlung
 
-Am eigenen Windows-Agenten **nicht weiterbauen**. Stattdessen zuerst Frage 1
-bis 3 klären und den Treiber einmal gegen den echten Server laufen lassen —
-danach lässt sich sagen, wie viel vom Agenten überhaupt übrig bleiben muss.
+Am eigenen Windows-Agenten **nicht weiterbauen**.
+
+Der nächste Schritt ist jetzt billiger als gedacht: bConnect im bMC aktivieren,
+`/bconnect/docs/` aufrufen und die Schnittstellenbeschreibung für den Kontext
+`jobs` mitnehmen. Damit sind Anmeldeverfahren, Zustandsnamen und die Frage nach
+der Rohausgabe zu klären, **ohne** am produktiven System etwas auszulösen.
+Danach einmal `listDevices` gegen den echten Server — rein lesend, beweist
+Erreichbarkeit, Anmeldung und Zertifikat in einem Zug.
+
+Erst danach lässt sich sagen, wie viel vom Agenten überhaupt übrig bleiben muss.

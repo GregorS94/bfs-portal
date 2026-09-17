@@ -76,7 +76,13 @@ function anfrage(bezeichnung, url, { methode = 'GET', koerper = null } = {}) {
   let daten = null;
   if (koerper !== null) {
     daten = Buffer.from(JSON.stringify(koerper));
-    headers['Content-Type'] = 'application/json';
+    // Der Zeichensatz gehoert ausdruecklich dazu: baramundi verlangt ihn in der
+    // bConnect-Dokumentation, sonst kommen Sonderzeichen falsch an. In einer
+    // deutschen Umgebung betrifft das jeden zweiten Job- und Geraetenamen.
+    headers['Content-Type'] = 'application/json; charset=utf-8';
+    // Buffer.from kodiert nach UTF-8, .length ist also die Byte-Zahl. Nicht
+    // durch die Zeichenzahl des Strings ersetzen — bei Umlauten waere der
+    // Koerper dann zu kurz angekuendigt.
     headers['Content-Length'] = String(daten.length);
   }
 
@@ -85,6 +91,10 @@ function anfrage(bezeichnung, url, { methode = 'GET', koerper = null } = {}) {
       url,
       { method: methode, headers, rejectUnauthorized: !CONFIG.allowSelfSigned, timeout: 30_000 },
       (res) => {
+        // Ohne das wird jeder Abschnitt einzeln nach UTF-8 gewandelt. Faellt ein
+        // Umlaut auf eine Abschnittsgrenze, zerreisst seine Byte-Folge und wird
+        // zu Ersatzzeichen. setEncoding haelt die Reste zusammen.
+        res.setEncoding('utf8');
         let body = '';
         res.on('data', (c) => (body += c));
         res.on('end', () => {
