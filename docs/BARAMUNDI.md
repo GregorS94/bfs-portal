@@ -118,14 +118,36 @@ nicht am laufenden System erraten werden. Die Beschreibung für den Kontext
 `jobs` herunterladen und gegen `interpretState()` legen, dann ist Punkt 3 der
 Fragenliste erledigt, ohne einen einzigen Job auszulösen.
 
-**Offen bleibt die Anmeldung.** Die Hilfe verweist für v2 auf
-[KB16874 — Windows-Authentifizierung mit bConnect v2 und Kiosk](https://feedback.baramundi.de/de/knowledge-base/article/kb16874-de)
-(hinter Anmeldung, nicht gelesen). Sollte die Instanz auf Windows-Authentifizierung
-stehen, greift weder `X-API-KEY` noch Basic, und der Treiber bräuchte
-Kerberos/NTLM — das kann er heute nicht. Welche Verfahren die Instanz annimmt,
-zeigt die Doku-Seite unter `/bconnect/docs/`. **Das ist vor allem anderen zu
-klären**, denn daran hängt, ob der Treiber überhaupt in der heutigen Form
-funktioniert.
+## Was die laufende Instanz sagt (Stand 2026-09-17)
+
+Gregor hat die Doku-Seite `/bconnect/docs` des BFS-Servers als Webarchiv
+geschickt. Damit ist einiges nicht mehr Vermutung:
+
+- **bMS 26.1.9.0**, bConnect v2 **ist aktiv** und über `https://<FQDN>/bconnect/…`
+  erreichbar. Kein abweichender Port, also 443 — die Vorgabe im Treiber stimmt.
+- **Alle drei Anmeldeverfahren werden angeboten:** Windows, Basic *und* API Key.
+  Damit ist die Sorge von vorhin ausgeräumt: `X-API-KEY` trägt, der Treiber passt
+  in seiner heutigen Form. Es braucht kein Kerberos.
+- **Zwölf Kontexte:** Active Directory, Assets, Compliance, Defense Control,
+  Endpoints, Jobs, Operating Systems, Server Management, Software, Universal
+  Dynamic Groups, Update Management, Variables.
+- Die Schnittstellenbeschreibungen liegen unter einem festen Muster:
+
+      https://<FQDN>/bconnect/<kontext>/openAPI/v2.0/bConnect_<Kontext>.json
+
+  also etwa `…/bconnect/jobs/openAPI/v2.0/bConnect_Jobs.json`. Der Kontext im
+  Pfad ist kleingeschrieben und ohne Trennzeichen (`activedirectory`,
+  `defensecontrol`, `updatemanagement`).
+- PATCH-Operationen arbeiten mit `JsonPatchDocument`, brauchen also den
+  Patch-Content-Type. Der Treiber schickt heute kein PATCH.
+
+**Der interessanteste Fund ist der Kontext `Active Directory`.** Kann bConnect
+Konten entsperren und Passwörter setzen, dann ist die dritte Aktionsgruppe ohne
+einen einzigen Agenten erreichbar — und Stufe 1 bräuchte gar keinen Agenten
+mehr. Das steht und fällt mit `bConnect_ActiveDirectory.json`; die Datei liegt
+noch nicht vor, und ohne sie ist das eine Hoffnung, keine Aussage.
+
+Der konkrete Hostname steht bewusst nicht hier, sondern gehört in die `.env`.
 
 ## Die Lücke zum eigenen Agenten
 
@@ -202,9 +224,8 @@ Freigabe laufen.
 1. ~~Ist **bConnect v2** in der laufenden bMS-Version enthalten?~~
    **Beantwortet:** ja, ab 2023 R1 und ohne eigene Konfiguration. Der Treiber
    steht auf `v2.0`.
-2. Welche **Anmeldeverfahren** nimmt die Instanz an — API-Schlüssel, Basic oder
-   Windows-Authentifizierung? Steht unter `/bconnect/docs/`. Bei reiner
-   Windows-Authentifizierung passt der Treiber heute nicht.
+2. ~~Welche **Anmeldeverfahren** nimmt die Instanz an?~~ **Beantwortet:**
+   Windows, Basic und API Key. Der API-Schlüssel ist der Weg.
 3. Liefert eine JobInstance **Rohausgabe** oder nur einen Status? Das
    entscheidet, ob Diagnose über Jobs überhaupt taugt. Steht im Schema.
 4. Wie heißen die Endzustände einer JobInstance? `interpretState()` rät
@@ -220,9 +241,10 @@ Freigabe laufen.
 
 Am eigenen Windows-Agenten **nicht weiterbauen**.
 
-Der nächste Schritt ist jetzt billiger als gedacht: bConnect im bMC aktivieren,
-`/bconnect/docs/` aufrufen und die Schnittstellenbeschreibung für den Kontext
-`jobs` mitnehmen. Damit sind Anmeldeverfahren, Zustandsnamen und die Frage nach
+Der nächste Schritt ist jetzt billiger als gedacht: bConnect ist bereits aktiv,
+es fehlen nur zwei Dateien von `/bconnect/docs` — `bConnect_Jobs.json` und
+`bConnect_ActiveDirectory.json`. Die zweite entscheidet, ob Kontosperre und
+Passwortrücksetzung ohne Agenten gehen. Damit sind Anmeldeverfahren, Zustandsnamen und die Frage nach
 der Rohausgabe zu klären, **ohne** am produktiven System etwas auszulösen.
 Danach einmal `listDevices` gegen den echten Server — rein lesend, beweist
 Erreichbarkeit, Anmeldung und Zertifikat in einem Zug.
