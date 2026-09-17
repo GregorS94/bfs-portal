@@ -235,9 +235,11 @@ AGENT_TOKEN=<die eben erzeugte Zeichenkette>
 AUDIT_RETENTION_DAYS=<Zahl>    # vor Produktivbetrieb Pflicht, siehe PROZESSE.md
 ```
 
-Atlassian, Entra und bConnect bleiben zunächst leer — die sind über die
+Atlassian und Graph bleiben zunächst leer — die sind über die
 Administrationsseite bequemer zu setzen, samt Probelauf-Knopf gegen das echte
-System. Ohne Entra-Konfiguration meldet das Portal einen Entwicklungs-Benutzer
+System. **baramundi bConnect und Entra gibt es dort nicht**, die stehen
+ausschließlich in dieser Datei; siehe [`CONFIGURATION.md`](CONFIGURATION.md)
+und [`BARAMUNDI.md`](BARAMUNDI.md). Ohne Entra-Konfiguration meldet das Portal einen Entwicklungs-Benutzer
 mit der Rolle aus `DEV_ROLE` an.
 
 Eine Falle: `ENTRA_ENABLED=true` mit unvollständigen IDs lässt **alle**
