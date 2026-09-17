@@ -135,10 +135,28 @@ Die Aktionen in `backend/actions.js` zerfallen in drei Gruppen:
 |---|---|---|
 | Diagnose am Gerät | `get_disk_space`, `get_memory`, `get_service_status`, `get_top_processes`, `get_failed_units` | eigener Agent |
 | Eingriff am Gerät | `restart_service`, `clear_journal_logs` | eigener Agent |
-| Verzeichnisdienst | `get_ad_account_status`, `unlock_ad_account`, `reset_ad_password` | AD/Entra, **nicht** der Agent |
+| Verzeichnisdienst | `get_ad_account_status`, `unlock_ad_account`, `reset_ad_password` | eigener Agent auf **einem** Domänenrechner |
 
 bConnect deckt heute nur die zweite Gruppe ab, und zwar als Job. Die dritte
-Gruppe bleibt unberührt — sie läuft nicht über baramundi.
+bleibt davon unberührt — sie läuft nicht über baramundi.
+
+**Zur dritten Gruppe, weil es hier früher falsch stand:** Diese drei Aktionen
+sind `windows:`-Definitionen in `backend/actions.js` und laufen damit über den
+eigenen Agenten, nicht über Graph. Der entscheidende Unterschied zur ersten
+Gruppe ist aber, dass sie **nicht auf dem Gerät des Anwenders** laufen müssen:
+`Get-ADUser` und `Unlock-ADAccount` brauchen irgendeinen Rechner in der Domäne
+mit RSAT. Ein einziger Agent auf einem Verwaltungsserver genügt — kein
+flächiges Ausrollen, keine Token auf hundert Arbeitsplätzen.
+
+Damit ist Kontosperre und Passwortrücksetzung erreichbar, ohne dass baramundi
+oder ein Agent im Feld existiert. Für ein Self-Service-Portal sind das die
+beiden häufigsten Anliegen überhaupt.
+
+**Offen dabei:** Der Agent läuft als `SYSTEM`, also unter dem Computerkonto.
+Das darf im AD von Haus aus lesen, aber weder entsperren noch Passwörter
+setzen. Dafür braucht es eine ausdrückliche Delegation auf die betreffende OU —
+oder der Agent muss auf diesem einen Rechner unter einem eigenen Dienstkonto
+laufen. `agent/install-windows.ps1` richtet ihn heute als `SYSTEM` ein.
 
 Der Knackpunkt ist die erste Gruppe: **lesende Diagnose in Echtzeit.** Ein
 Support-Gespräch fragt „wie voll ist die Platte jetzt". Über bConnect gäbe es
