@@ -279,12 +279,13 @@ Directory und ein **aktiver AD-Sync** in der bMS. Im AD integrierte Gruppen —
 Domänen-Admins etwa — werden bei der Kiosk-Anmeldung ausdrücklich *nicht*
 unterstützt; Freigaben brauchen also eigene Gruppen.
 
-**Ungeklärt:** ob der Kiosk lizenzrechtlich enthalten ist. Er steht in der
-Dokumentation unter „Zusatzoptionen", was auf eine eigene Lizenz hindeuten
-kann. Das beantwortet der Vertrag, nicht die Dokumentation.
+**Lizenziert ist er** (Gregor, 2026-09-18). Die Frage nach der Zusatzoption
+ist damit erledigt.
 
-Zu klären wäre außerdem: Läuft der Kiosk bei BFS überhaupt, und in welcher
-Perspektive? Die Antwort ändert womöglich, was unser Portal können muss.
+Zu klären bleibt: Ist die Kiosk-Schnittstelle eingeschaltet, und in welcher
+Perspektive läuft sie? Die Antwort ändert womöglich, was unser Portal können
+muss — für Softwarewünsche gäbe es dann bereits einen Weg, den niemand von uns
+warten muss.
 
 **Was es nicht ist:** ein Beitrag zur Diagnose. Der Kiosk beantwortet keine
 einzige Frage nach dem Zustand eines Geräts. Er wäre ein **dritter**
