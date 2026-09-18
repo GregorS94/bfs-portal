@@ -67,10 +67,6 @@ Oben steht der Weg, der funktioniert. Damit niemand den Prototyp für weiter
 hält, als er ist — die vier Punkte, die zwischen „sieht gut aus" und „darüber
 kann man entscheiden" liegen. Vollständig in [`docs/STATUS.md`](docs/STATUS.md).
 
-- **Die Vier-Augen-Freigabe läuft nur im Test.** `reset_ad_password` und
-  `unlock_ad_account` sind definiert, geprüft und mit Vier-Augen belegt — aber
-  im Portal fehlt der Knopf, der aus einer Passwort-Anfrage einen Auftrag
-  macht. Genau diese Kontrolle will eine Prüfung sehen.
 - **Kein Zielsystem ist echt angebunden.** Entra, Jira, Confluence und
   baramundi bConnect sind Attrappen. Was am echten Server anders heisst, weiss
   bisher niemand.
@@ -92,7 +88,7 @@ Testumgebung enthalten müsste, steht in
 ## Die Idee
 
 Klassischer 1st-Level-Support besteht zu großen Teilen aus immer denselben
-Handgriffen: Platte voll, Dienst hängt, Konto gesperrt, Passwort vergessen.
+Handgriffen: Platte voll, Dienst hängt, Protokolle laufen über.
 Das Portal lässt ein Sprachmodell diese Fälle aufnehmen, selbst nachsehen und
 — nach Freigabe — selbst beheben.
 
@@ -137,32 +133,19 @@ Geräte-Agent: [`docs/SETUP.md`](docs/SETUP.md).
 
 | Pfad | Bereich | Mindestrolle |
 |------|---------|--------------|
-| `/` | Mitarbeitende: Chat, eigene Freigaben, Passwort-Hilfe, Software | `user` |
-| `/it` | IT-Support: Aufträge, Geräte, Passwort-Hilfe, Audit-Log, fremde Freigaben | `it` |
+| `/` | Mitarbeitende: Chat, eigene Freigaben, Software | `user` |
+| `/it` | IT-Support: Aufträge, Geräte, Audit-Log, fremde Freigaben | `it` |
 | `/admin` | Administration: Dienste-Status, Zugangsdaten | `admin` |
 
 Rollen kommen aus Entra-App-Rollen (`portal.it`, `portal.admin`), ersatzweise
 aus `ENTRA_IT_USERS` / `ENTRA_ADMIN_USERS`, ohne Entra aus `DEV_ROLE`.
 
-## Anmelden — und der Fall, in dem das nicht geht
+## Anmelden
 
 Es gibt drei Anmeldewege, immer genau einen: `entra` (Microsoft 365, geprüft),
 `simple` (nur ein Name, **ungeprüft**, ausschliesslich für den Prototyp) und
 `off` (fester Entwicklungs-Benutzer). Details in
 [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md).
-
-Wer sein Passwort vergessen hat, kommt durch keinen dieser Wege — genau dann
-braucht er das Portal aber. Deshalb liegt **„Passwort vergessen" vor der
-Anmeldung**: Anmeldename eintragen, optional eine Rückrufnummer. Daraus wird
-ein Eintrag im Arbeitsvorrat der IT und, wenn Jira konfiguriert ist, ein
-Ticket.
-
-Was dabei ausdrücklich **nicht** passiert: Es wird nichts zurückgesetzt und
-nichts entsperrt. Die IT prüft die Identität ausserhalb des Portals — Rückruf,
-Personalnummer, Ausweis — und löst danach `reset_ad_password` aus, das eine
-zweite Person aus der IT freigeben muss. Die Antwort des offenen Endpunkts ist
-immer dieselbe, auch bei unbekanntem Konto; sonst wäre er ein Verzeichnis
-aller Anmeldenamen des Hauses.
 
 ![Administration: Dienste-Status und Zugangsdaten](docs/screenshots/07-administration.png)
 
@@ -180,7 +163,7 @@ ob etwas gesetzt ist.
 | [`docs/SETUP.md`](docs/SETUP.md) | Installation von null, Geräte-Agent, Entwicklungsmodus |
 | [`docs/INSTALL_UBUNTU.md`](docs/INSTALL_UBUNTU.md) | Frische Ubuntu-Server-VM: feste IP, Docker, Firewall |
 | [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) | Alle Umgebungsvariablen und Oberflächen-Einstellungen |
-| [`docs/API.md`](docs/API.md) | Alle 23 Endpunkte mit Rollen |
+| [`docs/API.md`](docs/API.md) | Alle Endpunkte mit Rollen |
 | [`docs/OPERATIONS.md`](docs/OPERATIONS.md) | Tests, Attrappen, Statusprüfung, bekannte Fallstricke |
 | [`docs/ENTRA_SETUP.md`](docs/ENTRA_SETUP.md) | App-Registrierung in Entra ID |
 | [`docs/PROZESSE.md`](docs/PROZESSE.md) | Prozesse und aufsichtsrechtliche Einordnung (DORA, MaRisk, DSGVO, AI Act) |

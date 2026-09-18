@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, CheckCircle, AlertCircle, ShieldAlert, Terminal, MessageSquare, KeyRound, Package, Loader2 } from 'lucide-react';
+import { Send, CheckCircle, AlertCircle, ShieldAlert, Terminal, MessageSquare, Package, Loader2 } from 'lucide-react';
 import RichText from '../markdown';
 import { authedFetch } from '../auth';
 
-// Mitarbeiter-Sicht: Chat, Passwort, Software. Keine Geräte, kein Audit.
+// Mitarbeiter-Sicht: Chat und Software. Keine Geräte, kein Audit.
 export default function UserPortal() {
   const [activeTab, setActiveTab] = useState('chat');
   const [messages, setMessages] = useState([]);
@@ -13,9 +13,6 @@ export default function UserPortal() {
   const [toolRuns, setToolRuns] = useState([]);
   const messagesEndRef = useRef(null);
 
-  const [passwordData, setPasswordData] = useState({
-    contact: '', note: '', loading: false, message: null, success: false
-  });
   const [softwareData, setSoftwareData] = useState({ available: [], loading: false });
 
   const addMessage = (role, content) =>
@@ -106,27 +103,6 @@ export default function UserPortal() {
     }
   };
 
-  // Kein Zuruecksetzen aus dem Portal heraus. Das Portal legt eine Anfrage an,
-  // die IT prueft die Identitaet ausserhalb und loest danach reset_ad_password
-  // aus — freigegeben von einer zweiten Person.
-  const requestPasswordHelp = async () => {
-    setPasswordData({ ...passwordData, loading: true, message: null });
-    try {
-      const res = await authedFetch('/api/self-service/password-help', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contact: passwordData.contact, note: passwordData.note })
-      });
-      const data = await res.json();
-      // Ohne diese Pruefung meldete die Oberflaeche auch dann Erfolg, wenn das
-      // Backend gar nichts angelegt hat.
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      setPasswordData({ contact: '', note: '', loading: false, message: data.message, success: true });
-    } catch (err) {
-      setPasswordData({ ...passwordData, loading: false, message: `Fehlgeschlagen: ${err.message}`, success: false });
-    }
-  };
-
   const loadSoftware = async () => {
     setSoftwareData({ ...softwareData, loading: true });
     const res = await authedFetch('/api/baramundi/software');
@@ -138,7 +114,6 @@ export default function UserPortal() {
 
   const TABS = [
     { id: 'chat', label: 'Chat', icon: MessageSquare },
-    { id: 'password', label: 'Passwort-Hilfe', icon: KeyRound },
     { id: 'software', label: 'Software', icon: Package }
   ];
 
@@ -247,40 +222,6 @@ export default function UserPortal() {
                 <Send size={20} />
               </button>
             </div>
-          </div>
-        )}
-
-        {activeTab === 'password' && (
-          <div className="max-w-md space-y-4">
-            <p className="text-sm text-gedimmt">
-              Passwort vergessen oder Konto gesperrt? Fordere Hilfe an. Der IT-Support prüft
-              deine Identität ausserhalb des Portals und setzt erst danach zurück — die
-              Freigabe erteilt eine zweite Person aus der IT.
-            </p>
-            <div>
-              <label className="block text-sm font-medium text-gedimmt mb-1">Rückruf (optional)</label>
-              <input value={passwordData.contact}
-                onChange={(e) => setPasswordData({ ...passwordData, contact: e.target.value })}
-                placeholder="Durchwahl oder Mobilnummer"
-                className="w-full px-4 py-2.5 bg-white border border-linie text-tinte rounded focus:outline-none focus:ring-2 focus:ring-akzent/50" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gedimmt mb-1">Anmerkung (optional)</label>
-              <textarea value={passwordData.note} rows={3}
-                onChange={(e) => setPasswordData({ ...passwordData, note: e.target.value })}
-                placeholder="z. B. Konto gesperrt seit heute früh"
-                className="w-full px-4 py-2.5 bg-white border border-linie text-tinte rounded focus:outline-none focus:ring-2 focus:ring-akzent/50" />
-            </div>
-            {passwordData.message && (
-              <div className={`p-3 rounded flex items-start gap-2 text-sm ${passwordData.success ? 'bg-[#e9f5ec] text-[#1f6b39] border border-[#b7dcc1]' : 'bg-[#fbeaea] text-[#a32020] border border-[#e8bcbc]'}`}>
-                {passwordData.success ? <CheckCircle size={18} className="shrink-0 mt-0.5" /> : <AlertCircle size={18} className="shrink-0 mt-0.5" />}
-                {passwordData.message}
-              </div>
-            )}
-            <button onClick={requestPasswordHelp} disabled={passwordData.loading}
-              className="w-full px-4 py-2.5 bg-akzent hover:bg-akzent-hell disabled:bg-[#ddd8d1] text-white rounded transition-colors font-medium">
-              {passwordData.loading ? 'Wird gesendet…' : 'Hilfe anfordern'}
-            </button>
           </div>
         )}
 

@@ -6,6 +6,14 @@
 const path = require('path');
 const { decisionProblem } = require(path.join(__dirname, '..', 'backend', 'approval.js'));
 const { rank } = require(path.join(__dirname, '..', 'backend', 'roles.js'));
+const { ACTIONS } = require(path.join(__dirname, '..', 'backend', 'actions.js'));
+
+// Seit dem 2026-09-17 nutzt keine ausgerollte Aktion mehr `fourEyes` — die
+// Kontoaktionen sind entfernt. Die Regel selbst bleibt trotzdem geprüft: sie
+// ist die sicherheitsrelevanteste Entscheidung im Portal und soll beim
+// nächsten Einbau einer Aktion für fremde Konten sofort greifen, statt erst
+// dann geschrieben zu werden. Dafür wird hier eine Prüfaktion eingesetzt.
+ACTIONS.__pruefung_vier_augen = { risk: 'write', fourEyes: true };
 
 let passed = 0;
 let failed = 0;
@@ -33,8 +41,8 @@ check('fremder Auftrag nicht als user', !may(anna, job('restart_service', it.id)
 check('IT darf fremde Aufträge freigeben', may(it, job('restart_service', anna.id)));
 check('Admin darf fremde Aufträge freigeben', may(admin, job('restart_service', anna.id)));
 
-console.log('\nVier-Augen bei Kontoaktionen');
-for (const action of ['reset_ad_password', 'unlock_ad_account']) {
+console.log('\nVier-Augen bei Aktionen für fremde Konten');
+for (const action of ['__pruefung_vier_augen']) {
   // Der Kern der Regel: Wer den Auftrag ausgelöst hat, darf ihn nicht selbst
   // freigeben — auch dann nicht, wenn die Rolle es sonst erlauben würde.
   check(`${action}: Anfragender darf nicht selbst freigeben (it)`, !may(it, job(action, it.id)));
@@ -46,10 +54,18 @@ for (const action of ['reset_ad_password', 'unlock_ad_account']) {
 }
 
 console.log('\nBegründungen');
-const reason = decisionProblem(it, job('reset_ad_password', it.id), rank);
+const reason = decisionProblem(it, job('__pruefung_vier_augen', it.id), rank);
 check('Selbstfreigabe nennt das Vier-Augen-Prinzip', /Vier-Augen/.test(reason || ''), reason);
-const reason2 = decisionProblem(anna, job('reset_ad_password', it.id), rank);
+const reason2 = decisionProblem(anna, job('__pruefung_vier_augen', it.id), rank);
 check('fehlende Rolle wird als solche benannt', /IT-Support/.test(reason2 || ''), reason2);
+
+console.log('\nEntfernte Kontoaktionen');
+// Sie sind weg; ein Auftrag mit diesem Namen faellt damit unter die
+// Grundregel und nicht mehr unter Vier-Augen. Die Pruefung haelt fest, dass
+// ein Wiedereinbau ohne `fourEyes` auffaellt.
+for (const action of ['reset_ad_password', 'unlock_ad_account', 'get_ad_account_status']) {
+  check(`${action} ist nicht mehr registriert`, !ACTIONS[action]);
+}
 
 // Eine unbekannte Aktion darf nicht versehentlich als harmlos durchrutschen,
 // aber auch nicht härter behandelt werden als eine gewöhnliche.

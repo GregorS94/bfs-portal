@@ -50,18 +50,22 @@ Argumentliste an `CreateProcess` übergibt (Anführungszeichen in den
 Skripttexten), lässt sich nur auf einem Windows-Rechner feststellen. Der
 Freigabe-Mechanismus ist geprüft, die Übergabe nicht.
 
-## Vier-Augen bei Kontoaktionen
+## Vier-Augen für Aktionen an fremden Konten
 
-`reset_ad_password` und `unlock_ad_account` tragen `fourEyes: true`. Für sie
-gilt: Die anfragende Person darf den eigenen Auftrag **nicht** freigeben, und
-es braucht mindestens die Rolle `it`.
+Die Regel steht in `backend/approval.js`: Eine Aktion mit `fourEyes: true` darf
+die anfragende Person **nicht** selbst freigeben, und es braucht mindestens die
+Rolle `it`.
 
-Der Grund ist einfach: Diese Aktionen betreffen ein fremdes Konto. Die
-Zustimmung des Anfragenden ist dort keine Kontrolle, sondern nur ein zweiter
-Klick derselben Person.
+Der Grund: Solche Aktionen betreffen ein fremdes Konto. Die Zustimmung des
+Anfragenden ist dort keine Kontrolle, sondern nur ein zweiter Klick derselben
+Person.
 
-Die Logik liegt in `backend/approval.js` — bewusst als eigenes Modul, damit sie
-ohne laufenden Server prüfbar ist (`tools/approval-test.js`).
+**Derzeit nutzt keine ausgerollte Aktion `fourEyes`.** Die Kontoaktionen, für
+die die Regel geschrieben wurde, sind am 2026-09-17 aus dem Umfang genommen
+worden (siehe [`FAHRPLAN.md`](FAHRPLAN.md)). Die Regel bleibt trotzdem
+bestehen und wird in `tools/approval-test.js` mit einer Prüfaktion belegt —
+sie soll beim nächsten Einbau einer Aktion für fremde Konten sofort greifen,
+statt erst dann geschrieben zu werden.
 
 ## Geräte-Token
 
@@ -113,9 +117,9 @@ auf ein System auszuleiten, auf dem der Portal-Host keine Schreibrechte hat.
 
 ## Geheimnisse
 
-- **Das Einmal-Passwort ist kein Parameter.** Es entsteht auf dem Zielrechner
-  über `RandomNumberGenerator`. Parameter landen vollständig im Audit-Log,
-  Ausgaben nur als `outputBytes`.
+- **Parameter landen vollständig im Audit-Log**, Ausgaben nur als
+  `outputBytes`. Wer eine Aktion einbaut, deren Parameter ein Geheimnis
+  enthalten könnte, muss das hier bedenken.
 - **Geheimnisse gehen nie an den Browser zurück.** Die Einstellungs-API
   liefert pro Feld nur `set: true/false`. Ein leeres Geheimnisfeld heißt
   „nicht anfassen" — sonst löschte jedes Speichern das Token, weil das
@@ -154,28 +158,8 @@ mit einer echten Anmeldung verwechselt wird:
 
 Für den Echtbetrieb ist `ENTRA_ENABLED=true` der einzige zulässige Weg.
 
-### Passwort-Hilfe ohne Anmeldung
-
-Wer sein Passwort vergessen hat, kann sich nicht anmelden — der Weg dorthin
-muss also offen sein. Drei Eigenschaften halten das im Rahmen:
-
-1. **Keine Auskunft über den Bestand.** Die Antwort ist immer dieselbe, egal ob
-   es das Konto gibt, ob ein Ticket entstanden ist oder ob die Begrenzung
-   gegriffen hat. Sonst wäre die Route ein Verzeichnis aller Anmeldenamen.
-2. **Begrenzung je Absender** über `req.ip`, vorgabegemäss fünf Anfragen in
-   fünfzehn Minuten.
-3. **Kein Automatismus.** Die Route setzt nichts zurück und ändert kein Konto.
-   Sie legt einen Eintrag für die IT an. Das Zurücksetzen selbst bleibt
-   `reset_ad_password` — mit Vier-Augen-Freigabe.
-
 ## Bewusste Grenzen
 
-- **SSPR hat keine API.** Microsoft stellt keinen Endpunkt bereit, um den
-  Rücksetz-Dialog auszulösen. `authenticationMethod: resetPassword` ist nur
-  *delegiert* nutzbar, verlangt *Authentication Administrator* und erreicht in
-  Hybrid-Mandanten das lokale AD nur mit Password Writeback. Ein Dienst-Token
-  kann das nicht — deshalb nicht implementiert. Was geht, ist die Triage:
-  `isSsprEnabled`, `isSsprRegistered`, `isSsprCapable`.
 - **`GET /api/health/services` ist ungeschützt.** Absicht: ein externer
   Wächter soll ohne Anmeldung Schlüsselwörter prüfen können. Die Antwort
   verrät die Anzahl bekannter Geräte und welche Fremdsysteme konfiguriert
@@ -194,9 +178,6 @@ muss also offen sein. Drei Eigenschaften halten das im Rahmen:
 
 - Freigabe eines **fremden** Auftrags als Rolle `user` — dafür braucht es zwei
   echte Identitäten, also einen Mandanten.
-- Die Begrenzung der offenen Passwort-Hilfe zählt im Arbeitsspeicher. Nach
-  einem Neustart des Backends beginnt sie von vorn, und mehrere Backend-
-  Instanzen zählen getrennt.
 - Der Hybrid-Fall am echten Entra-Mandanten.
 - Der bConnect-Treiber gegen einen echten baramundi-Server; verifiziert ist er
   nur gegen `tools/bconnect-mock.js`.

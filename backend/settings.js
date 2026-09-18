@@ -24,17 +24,10 @@ const SCHEMA = {
     projectKey: { env: 'JIRA_PROJECT_KEY', label: 'Jira-Projektschlüssel' },
     issueType: { env: 'JIRA_ISSUE_TYPE', label: 'Vorgangstyp', fallback: 'Aufgabe' },
     spaceKeys: { env: 'CONFLUENCE_SPACE_KEYS', label: 'Confluence-Bereiche (kommagetrennt)' }
-  },
-  entra: {
-    tenantId: { env: 'ENTRA_TENANT_ID', label: 'Mandanten-ID' },
-    clientId: { env: 'ENTRA_GRAPH_CLIENT_ID', label: 'Anwendungs-ID' },
-    clientSecret: { env: 'ENTRA_GRAPH_CLIENT_SECRET', label: 'Geheimnis', secret: true },
-    authBase: { env: 'ENTRA_AUTH_BASE', label: 'Anmelde-Adresse (nur für Tests)' },
-    graphBase: { env: 'ENTRA_GRAPH_BASE', label: 'Graph-Adresse (nur für Tests)' }
   }
 };
 
-let stored = null; // { atlassian: {...}, entra: {...} }
+let stored = null; // { atlassian: {...} }
 
 function load() {
   if (stored) return stored;

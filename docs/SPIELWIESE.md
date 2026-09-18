@@ -32,7 +32,7 @@ und sie läuft bisher nur im automatisierten Test. Anleitung:
 
 **3. Eine Graph-App mit `AuditLog.Read.All`** (Anwendungsberechtigung, mit
 Administrator-Zustimmung). Ausschliesslich lesend — damit prüft das Portal vor
-einem Passwort-Fall, ob die Person die Selbstbedienung schon eingerichtet hat.
+einem Störungsfall, wie der Rechner gerade dasteht.
 Für das Zurücksetzen selbst ist bewusst **kein** Graph-Recht vorgesehen.
 
 **4. Zwei bis drei Wegwerf-Konten im Test-AD**, an denen Zurücksetzen und

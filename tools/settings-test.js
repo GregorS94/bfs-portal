@@ -85,12 +85,19 @@ check('Geheimnisse verlassen den Speicher nicht', () => {
 });
 
 check('redactAll deckt alle Bereiche ab und enthält kein Geheimnis', () => {
-  settings.update('entra', { clientSecret: 'auch-geheim-456', tenantId: 'abc-123' });
   const all = settings.redactAll();
-  assert.deepStrictEqual(Object.keys(all).sort(), ['atlassian', 'entra']);
-  assert.ok(!JSON.stringify(all).includes('auch-geheim-456'));
-  assert.strictEqual(all.entra.fields.tenantId.value, 'abc-123');
-  assert.strictEqual(all.entra.secrets.clientSecret.set, true);
+  // Seit dem 2026-09-17 gibt es nur noch eine Gruppe: die Graph-Zugangsdaten
+  // hingen an der Passwort-Triage und sind mit ihr entfernt worden.
+  assert.deepStrictEqual(Object.keys(all).sort(), ['atlassian']);
+  assert.ok(!JSON.stringify(all).includes('streng-geheim-123'));
+  assert.strictEqual(all.atlassian.fields.baseUrl.value, 'https://neu.atlassian.net');
+  assert.strictEqual(all.atlassian.secrets.apiToken.set, true);
+});
+
+check('eine unbekannte Gruppe wird abgewiesen', () => {
+  // Fruehere Fassungen kannten 'entra'. Eine gespeicherte Einstellung aus der
+  // Zeit darf nicht stillschweigend wieder angelegt werden.
+  assert.throws(() => settings.update('entra', { tenantId: 'abc-123' }));
 });
 
 check('die Datei ist nur für den Besitzer lesbar', () => {
@@ -101,7 +108,6 @@ check('die Datei ist nur für den Besitzer lesbar', () => {
 check('nach einem Neustart stehen die Werte noch da', () => {
   settings.reload();
   assert.strictEqual(settings.value('atlassian', 'apiToken'), 'streng-geheim-123');
-  assert.strictEqual(settings.value('entra', 'tenantId'), 'abc-123');
 });
 
 fs.rmSync(DIR, { recursive: true, force: true });

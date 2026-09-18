@@ -57,17 +57,9 @@ darf nur eigene Aufträge freigeben, `it` und `admin` auch fremde.
 
 Verlauf über 20 Züge, Kosten rund 0,9 ct pro Gespräch.
 
-### Werkzeuge, die das Modell nicht sieht
-
-Die drei AD-Aktionen (`get_ad_account_status`, `unlock_ad_account`,
-`reset_ad_password`) tragen `chat: false` und sind aus den Werkzeugdefinitionen
-herausgefiltert. Sonst ginge ihre Ausgabe als `tool_result` zurück ins Modell,
-und ein Einmal-Passwort stünde im Chatverlauf. Sie laufen ausschließlich über
-die IT-Oberfläche.
-
 ## Aktionen
 
-`backend/actions.js` definiert 11 Aktionen, jede mit `risk`, JSON-Schema für
+`backend/actions.js` definiert 8 Aktionen, jede mit `risk`, JSON-Schema für
 die Eingabe und je einer Variante für Linux und Windows/PowerShell:
 
 | Aktion | Risiko | Plattform |
@@ -75,17 +67,16 @@ die Eingabe und je einer Variante für Linux und Windows/PowerShell:
 | `get_disk_space`, `get_memory`, `get_uptime` | read | beide |
 | `get_service_status`, `get_top_processes`, `get_failed_units` | read | beide |
 | `restart_service`, `clear_journal_logs` | write | beide |
-| `get_ad_account_status` | read | nur Windows |
-| `unlock_ad_account`, `reset_ad_password` | write | nur Windows |
 
-Die AD-Aktionen sind ohne Domäne sinnlos; unter Linux wirft `resolveCommand`.
+Alle acht sind im Chat wählbar. `chat: false` gibt es weiterhin als
+Möglichkeit, wird derzeit aber von keiner Aktion genutzt — die Kontoaktionen,
+für die es gedacht war, sind am 2026-09-17 aus dem Umfang genommen worden.
 
 ## Treiber
 
 | Datei | System | Besonderheit |
 |-------|--------|--------------|
 | `drivers/atlassian.js` | Confluence + Jira | ein Treiber für beide — Atlassian Cloud nutzt dieselbe Adresse und Anmeldung |
-| `drivers/entra.js` | Microsoft Graph | nur SSPR-*Triage*; das Zurücksetzen selbst hat keine API |
 | `drivers/bconnect.js` | baramundi bMC 26.1 | Jobs nur aus `BCONNECT_ALLOWED_JOBS` |
 
 Treiber lesen ihre Konfiguration bei jedem Zugriff frisch aus `settings.js` —
