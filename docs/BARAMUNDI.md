@@ -237,6 +237,31 @@ Es *erlaubt*, und der Anwender entscheidet selbst, ob und wann. Freigabe und
 Ausführung liegen in verschiedenen Händen, ohne dass wir dafür ein
 Vier-Augen-Verfahren bauen müssten — der Kiosk trennt sie von sich aus.
 
+**Und der Kiosk ist selbst schon ein Self-Service-Portal.** Das steht so in
+der Herstellerdokumentation (2026 R1, „Zusatzoptionen → Kiosk"):
+
+> Der baramundi Kiosk ist ein Self-Service-Portal, mit dem sich Ihre Anwender
+> selbstständig Jobs zuweisen können, z. B. die Installation von Software.
+
+Er ist eine Webanwendung auf einem internen Webserver, erreichbar unter
+`{Serveradresse}/bWebServer/Kiosk` — bei BFS also am selben Host wie bConnect.
+Es gibt drei Betriebsarten:
+
+| Perspektive | Anmeldung | Wofür gedacht |
+|---|---|---|
+| Gerät | keine | gemeinsam genutzte Rechner; Jobs für das Gerät, an dem man sitzt |
+| Nutzer | ja | Freigaben je AD-Nutzer oder AD-Gruppe, für alle eigenen Geräte |
+| gemischt | ja | allgemeine Jobs für alle, einzelne nur für bestimmte Nutzer |
+
+**Das ist für die Frage nach dem Zuschnitt unseres Portals erheblich.** Für
+Softwarewünsche existiert bei BFS möglicherweise bereits ein fertiges,
+gewartetes Self-Service-Portal — es muss nur eingerichtet sein. Unser Portal
+müsste das dann nicht nachbauen; es könnte Freigaben erteilen und im Übrigen
+auf den Kiosk verweisen.
+
+Zu klären wäre: Läuft der Kiosk bei BFS überhaupt, und in welcher Perspektive?
+Die Antwort ändert womöglich, was unser Portal können muss.
+
 **Was es nicht ist:** ein Beitrag zur Diagnose. Der Kiosk beantwortet keine
 einzige Frage nach dem Zustand eines Geräts. Er wäre ein **dritter**
 Anwendungsfall neben Chat und Gerätediagnose — Softwarewünsche —, und ob der
