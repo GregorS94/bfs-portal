@@ -259,8 +259,32 @@ gewartetes Self-Service-Portal — es muss nur eingerichtet sein. Unser Portal
 müsste das dann nicht nachbauen; es könnte Freigaben erteilen und im Übrigen
 auf den Kiosk verweisen.
 
-Zu klären wäre: Läuft der Kiosk bei BFS überhaupt, und in welcher Perspektive?
-Die Antwort ändert womöglich, was unser Portal können muss.
+#### In Betrieb nehmen — was dazu nötig ist
+
+Aus der Dokumentation, „Den Kiosk im bMC konfigurieren". Es ist durchweg
+Konfiguration, **kein Programmieren**:
+
+1. **Schnittstelle einschalten** unter *Konfiguration → Schnittstellen* —
+   dieselbe Maske, in der auch bConnect steht.
+2. **Jobs für den Kiosk herrichten**: Anzeigename und Beschreibung vergeben.
+   Der Anwender sieht Kacheln oder eine Liste, keine internen Jobnamen.
+3. **Freigeben**, wahlweise für Geräte und Gruppen oder für AD-Benutzer. Genau
+   diese Freigabe legt `POST /v2.0/KioskReleases` an — unser Portal könnte sie
+   also erteilen, ohne dass jemand ins bMC muss.
+4. Optional: **Tray-Symbol** beim Management Agent, unter *Server →
+   Grundeinstellungen → Management Agent*.
+
+**Voraussetzung für die Nutzer-Perspektive:** Benutzerverwaltung im Active
+Directory und ein **aktiver AD-Sync** in der bMS. Im AD integrierte Gruppen —
+Domänen-Admins etwa — werden bei der Kiosk-Anmeldung ausdrücklich *nicht*
+unterstützt; Freigaben brauchen also eigene Gruppen.
+
+**Ungeklärt:** ob der Kiosk lizenzrechtlich enthalten ist. Er steht in der
+Dokumentation unter „Zusatzoptionen", was auf eine eigene Lizenz hindeuten
+kann. Das beantwortet der Vertrag, nicht die Dokumentation.
+
+Zu klären wäre außerdem: Läuft der Kiosk bei BFS überhaupt, und in welcher
+Perspektive? Die Antwort ändert womöglich, was unser Portal können muss.
 
 **Was es nicht ist:** ein Beitrag zur Diagnose. Der Kiosk beantwortet keine
 einzige Frage nach dem Zustand eines Geräts. Er wäre ein **dritter**
