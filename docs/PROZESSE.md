@@ -113,7 +113,10 @@ Nachweis: Audit-Log mit Auftrag, freigebender Person und Ergebnis.
 
 Das erfüllt zugleich die menschliche Aufsicht über das KI-System.
 
-*Erledigt:* `reset_ad_password` und `unlock_ad_account` tragen `fourEyes: true`.
+*Stand 2026-09-17:* Die Kontoaktionen sind entfernt; derzeit trägt keine
+ausgerollte Aktion `fourEyes: true`. Die Regel in `backend/approval.js` bleibt
+bestehen und wird mit einer Prüfaktion belegt (`tools/approval-test.js`), damit
+sie beim nächsten Einbau einer Aktion für fremde Konten sofort greift.
 Die anfragende Person kann den eigenen Auftrag nicht freigeben; es braucht
 mindestens Rolle `it`. Logik in `backend/approval.js`, geprüft in
 `tools/approval-test.js`.
@@ -243,7 +246,8 @@ organisatorisch und dauern am längsten, deshalb zuerst anstoßen.
 3. AVV und Drittlandtransfer mit Anthropic, DSFA prüfen (Datenschutz).
 4. Aufbewahrungsfrist für das Audit-Log **als Zahl** festlegen — die Technik
    dafür steht, `AUDIT_RETENTION_DAYS` ist nur noch zu setzen.
-5. ~~Vier-Augen-Prinzip für Passwort- und Kontoaktionen.~~ **erledigt**
+5. ~~Vier-Augen-Prinzip für Passwort- und Kontoaktionen.~~ **entfallen** —
+   die Kontoaktionen sind am 2026-09-17 aus dem Umfang genommen worden.
 6. Pull-Request-Pflicht auf `main` — Repository-Einstellung, siehe
    [`OPERATIONS.md`](OPERATIONS.md). ~~Test- und Produktivumgebung trennen.~~
    **erledigt**

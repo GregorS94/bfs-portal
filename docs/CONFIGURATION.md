@@ -60,22 +60,6 @@ Namenslisten steht. Der Weg ist für den Prototyp gedacht: die Sitzung ist im
 Portal sichtbar als „Identität ungeprüft" markiert und im Audit-Log als
 `verified: false` vermerkt. Für den Echtbetrieb `ENTRA_ENABLED=true`.
 
-## Öffentliche Passwort-Hilfe
-
-`POST /api/public/password-help` ist die einzige Route, die ohne Anmeldung
-etwas anlegt — sie muss es sein, denn wer sein Passwort vergessen hat, kommt
-nicht ins Portal.
-
-| Variable | Vorgabe | Bedeutung |
-|----------|---------|-----------|
-| `PUBLIC_RATE_MAX` | `5` | Anfragen je Absender im Zeitfenster |
-| `PUBLIC_RATE_WINDOW_MINUTES` | `15` | Länge des Zeitfensters |
-
-Die Zählung läuft über `req.ip`. Das Backend vertraut dafür genau einem
-Zwischenschritt (`app.set('trust proxy', 1)`) — nginx. Steht ein weiterer
-Proxy davor, muss dieser Wert mitwachsen, sonst landen alle Absender in einem
-Topf.
-
 **Unvollständig konfiguriert blockiert.** `ENTRA_ENABLED=true` ohne die drei
 IDs liefert 500 auf allen Portal-Routen, statt still auf den
 Entwicklungs-Benutzer zurückzufallen.
@@ -95,20 +79,6 @@ Auch über die Oberfläche setzbar, Gruppe `atlassian`.
 
 Projekt und Vorgangstyp kommen ausschließlich von hier — nie aus einem Aufruf
 oder aus dem Modell. Sonst legt ein Gespräch Tickets in fremden Projekten an.
-
-## Microsoft Graph (SSPR-Triage)
-
-Gruppe `entra` in der Oberfläche.
-
-| Variable | Bedeutung |
-|----------|-----------|
-| `ENTRA_GRAPH_CLIENT_ID` | Anwendungs-ID der Graph-App |
-| `ENTRA_GRAPH_CLIENT_SECRET` | Geheimnis |
-| `ENTRA_AUTH_BASE` | nur für Tests gegen eine Attrappe |
-| `ENTRA_GRAPH_BASE` | nur für Tests gegen eine Attrappe |
-
-Benötigte App-Berechtigung: **`AuditLog.Read.All`** für
-`/reports/authenticationMethods/userRegistrationDetails`.
 
 ## baramundi bConnect
 

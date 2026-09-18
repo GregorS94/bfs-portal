@@ -1,5 +1,5 @@
-// Prüft die AD-Kontoaktionen ohne Windows: Befehlsform, Validierung und
-// die Zusicherung, dass sie nicht im Chat auftauchen.
+// Prüft die Aktionsliste: welche Aktionen es gibt, dass sie im Chat wählbar
+// sind und dass die entfernten Kontoaktionen nicht zurückkommen.
 // Aufruf auf dem Pi: node tools/actions-test.js
 const assert = require('assert');
 // Im Repo liegt actions.js unter backend/, im Container direkt neben /app/tools.
@@ -42,76 +42,57 @@ function rejects(action, params, platform, expected) {
   );
 }
 
-console.log('AD-Kontoaktionen');
+console.log('Aktionsliste');
 
-check('die drei Aktionen sind registriert', () => {
+// Der Umfang ist eine bewusste Festlegung, kein Zufall: Chat und Prüfung am
+// Gerät. Kontoaktionen wurden am 2026-09-17 entfernt (siehe FAHRPLAN.md).
+const ERWARTET = [
+  'get_disk_space', 'get_memory', 'get_uptime', 'get_service_status',
+  'get_top_processes', 'get_failed_units', 'restart_service', 'clear_journal_logs'
+];
+
+check('genau die erwarteten Aktionen sind registriert', () => {
+  assert.deepStrictEqual(Object.keys(ACTIONS).sort(), [...ERWARTET].sort());
+});
+
+check('die Kontoaktionen sind weg und kommen nicht zurück', () => {
+  // Das ist der eigentliche Zweck dieser Prüfung: ein Wiedereinbau aus Versehen
+  // wäre sonst nicht zu bemerken. reset_ad_password baut ein Einmal-Passwort,
+  // das über tool_result in den Chatverlauf geraten könnte.
   for (const name of ['get_ad_account_status', 'unlock_ad_account', 'reset_ad_password']) {
-    assert.ok(ACTIONS[name], `${name} fehlt`);
+    assert.ok(!ACTIONS[name], `${name} ist wieder da`);
+    // "Unbekannte Aktion" ist hier der richtige Grund — die Aktion existiert
+    // nicht mehr, sie ist nicht bloss auf dieser Plattform undefiniert.
+    rejects(name, { identity: 'm.mustermann' }, 'windows', /Unbekannte Aktion/);
   }
 });
 
-check('keine davon ist im Chat wählbar', () => {
+check('alle Aktionen sind im Chat wählbar', () => {
   const chatTools = toolDefinitions().map((t) => t.name);
-  for (const name of ['get_ad_account_status', 'unlock_ad_account', 'reset_ad_password']) {
-    assert.ok(!chatTools.includes(name), `${name} taucht in toolDefinitions auf`);
+  assert.deepStrictEqual(chatTools.sort(), [...ERWARTET].sort());
+});
+
+check('schreibende Aktionen sind als solche gekennzeichnet', () => {
+  // Daran hängt die Freigabe: ohne `risk: 'write'` liefe der Eingriff ohne
+  // Rückfrage durch.
+  for (const name of ['restart_service', 'clear_journal_logs']) {
+    assert.strictEqual(ACTIONS[name].risk, 'write', name);
   }
-  // Die bestehenden Aktionen müssen weiterhin drin sein.
-  assert.ok(chatTools.includes('get_disk_space'));
-  assert.ok(chatTools.includes('restart_service'));
-  assert.strictEqual(chatTools.length, Object.keys(ACTIONS).length - 3);
-});
-
-check('Entsperren baut den erwarteten Befehl', () => {
-  const cmd = resolveCommand('unlock_ad_account', { identity: 'm.mustermann' }, 'windows');
-  assert.strictEqual(cmd.file, 'powershell.exe');
-  // Der Kontoname steht als eigenes argv-Element, nicht im Befehlstext.
-  assert.strictEqual(cmd.args[cmd.args.length - 1], 'm.mustermann');
-  assert.ok(cmd.args[3].includes('Unlock-ADAccount'));
-  assert.ok(!cmd.args[3].includes('m.mustermann'), 'Name wurde in den Befehl interpoliert');
-});
-
-check('Zurücksetzen erzwingt Wechsel bei der nächsten Anmeldung', () => {
-  const cmd = resolveCommand('reset_ad_password', { identity: 'm.mustermann@bfs.de' }, 'windows');
-  const script = cmd.args[3];
-  assert.ok(script.includes('Set-ADAccountPassword'));
-  assert.ok(script.includes('ChangePasswordAtLogon $true'));
-  assert.ok(script.includes('RandomNumberGenerator'), 'Passwort muss auf dem Ziel entstehen');
-});
-
-check('das Passwort ist kein Parameter', () => {
-  // Parameter landen im Audit-Log (jobs.js, job.created). Ein Passwortfeld
-  // im Schema wäre genau der Weg, auf dem es dort hineinkäme.
-  for (const name of ['reset_ad_password', 'unlock_ad_account', 'get_ad_account_status']) {
-    const props = Object.keys(ACTIONS[name].input_schema.properties);
-    assert.deepStrictEqual(props, ['identity'], `${name} hat unerwartete Felder: ${props}`);
-    assert.strictEqual(ACTIONS[name].input_schema.additionalProperties, false);
+  for (const name of ERWARTET.filter((n) => n.startsWith('get_'))) {
+    assert.strictEqual(ACTIONS[name].risk, 'read', name);
   }
 });
 
-check('unter Linux gibt es diese Aktionen nicht', () => {
-  for (const name of ['get_ad_account_status', 'unlock_ad_account', 'reset_ad_password']) {
-    rejects(name, { identity: 'm.mustermann' }, 'linux', /nicht definiert/);
+check('jede Aktion kennt beide Plattformen', () => {
+  for (const name of ERWARTET) {
+    assert.ok(typeof ACTIONS[name].linux === 'function', `${name}: linux fehlt`);
+    assert.ok(typeof ACTIONS[name].windows === 'function', `${name}: windows fehlt`);
   }
 });
 
-check('Kontonamen werden validiert', () => {
-  const böse = [
-    'm.mustermann; Remove-ADUser',
-    'CN=Admin,DC=bfs,DC=de',
-    'admin)(objectClass=*',
-    'domain\\admin',
-    'm mustermann',
-    '',
-    'a'.repeat(300)
-  ];
-  for (const identity of böse) {
-    rejects('unlock_ad_account', { identity }, 'windows', /Ungültiger Kontoname/);
-  }
-});
-
-check('gültige Namen kommen durch', () => {
-  for (const identity of ['m.mustermann', 'm.mustermann@bfs.de', 'svc-backup_01']) {
-    assert.ok(resolveCommand('get_ad_account_status', { identity }, 'windows'));
+check('Dienstnamen werden validiert', () => {
+  for (const service of ['sshd; rm -rf /', 'a b', '', 'x'.repeat(300)]) {
+    rejects('restart_service', { service }, 'linux', /Ungültig|ungültig/);
   }
 });
 

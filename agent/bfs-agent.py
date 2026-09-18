@@ -138,12 +138,6 @@ ALLOWED_POWERSHELL = {
     'Restart-Service -Name $args[0] -Force',
     # clear_journal_logs
     'Clear-EventLog -LogName Application',
-    # get_ad_account_status
-    'Get-ADUser -Identity $args[0] -Properties LockedOut,Enabled,PasswordExpired,PasswordLastSet,LastLogonDate | Select-Object SamAccountName,Enabled,LockedOut,PasswordExpired,PasswordLastSet,LastLogonDate | Format-List',
-    # unlock_ad_account
-    'Unlock-ADAccount -Identity $args[0] -Confirm:$false; "Konto {0} entsperrt." -f $args[0]',
-    # reset_ad_password
-    '$b = [byte[]]::new(18); [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); $pw = \'Bfs!\' + [Convert]::ToBase64String($b).TrimEnd(\'=\').Replace(\'/\',\'x\').Replace(\'+\',\'y\'); Set-ADAccountPassword -Identity $args[0] -Reset -NewPassword (ConvertTo-SecureString $pw -AsPlainText -Force) -Confirm:$false; Set-ADUser -Identity $args[0] -ChangePasswordAtLogon $true; Unlock-ADAccount -Identity $args[0] -Confirm:$false; "Einmal-Passwort fuer {0}: {1}" -f $args[0], $pw',
 }
 
 ALLOWED_WINDOWS = {"powershell.exe": None}

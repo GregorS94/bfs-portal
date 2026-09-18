@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, ShieldAlert, ClipboardList, Wrench, KeyRound, ScrollText } from 'lucide-react';
+import { RefreshCw, ShieldAlert, ClipboardList, Wrench, ScrollText } from 'lucide-react';
 import { authedFetch } from '../auth';
 
 // IT-Bereich: Geräte, offene Freigaben, Auftragsverlauf, Audit-Log.
@@ -9,7 +9,6 @@ export default function ITArea() {
   const [devices, setDevices] = useState({ list: [], loading: false, error: null });
   const [jobs, setJobs] = useState({ list: [], loading: false, error: null });
   const [audit, setAudit] = useState({ entries: [], loading: false, error: null });
-  const [pwHelp, setPwHelp] = useState({ list: [], loading: false, error: null });
 
   const loadDevices = async () => {
     setDevices(d => ({ ...d, loading: true }));
@@ -29,17 +28,6 @@ export default function ITArea() {
     setAudit({ entries: data.entries || [], loading: false, error: data.error || null });
   };
 
-  const loadPwHelp = async () => {
-    setPwHelp(h => ({ ...h, loading: true }));
-    const data = await (await authedFetch('/api/password-requests')).json();
-    setPwHelp({ list: data.requests || [], loading: false, error: data.error || null });
-  };
-
-  const closePwHelp = async (id) => {
-    await authedFetch(`/api/password-requests/${id}/close`, { method: 'POST' });
-    loadPwHelp();
-  };
-
   const decide = async (jobId, approve) => {
     await authedFetch(`/api/jobs/${jobId}/${approve ? 'approve' : 'deny'}`, { method: 'POST' });
     loadJobs();
@@ -49,14 +37,12 @@ export default function ITArea() {
     if (activeTab === 'devices') loadDevices();
     if (activeTab === 'jobs') loadJobs();
     if (activeTab === 'audit') loadAudit();
-    if (activeTab === 'pwhelp') loadPwHelp();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
   const TABS = [
     { id: 'jobs', label: 'Aufträge', icon: ClipboardList },
     { id: 'devices', label: 'Geräte', icon: Wrench },
-    { id: 'pwhelp', label: 'Passwort-Hilfe', icon: KeyRound },
     { id: 'audit', label: 'Audit-Log', icon: ScrollText }
   ];
 
@@ -159,48 +145,6 @@ export default function ITArea() {
                   </div>
                   <p className="text-sm text-leise">{d.platform} · {d.osVersion}</p>
                   <p className="text-xs text-leise mt-2">zuletzt gesehen: {new Date(d.lastSeen).toLocaleTimeString('de-DE')}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'pwhelp' && (
-          <div>
-            <div className="flex items-start gap-2 mb-4 p-3 rounded bg-[#fdf3e2] border border-[#e9c98f] text-[#8a5200] text-sm">
-              <ShieldAlert size={18} className="shrink-0 mt-0.5" />
-              <span>
-                Diese Anfragen kommen ohne Anmeldung herein — die Kennung ist <strong>behauptet, nicht geprüft</strong>.
-                Identität telefonisch oder persönlich prüfen, erst danach zurücksetzen.
-              </span>
-            </div>
-            <button onClick={loadPwHelp} className="mb-4 px-4 py-2 bg-akzent hover:bg-akzent-hell text-white rounded transition-colors">
-              <><RefreshCw size={14} className={pwHelp.loading ? 'animate-spin' : ''} /> Aktualisieren</>
-            </button>
-            <div className="bg-white border border-linie rounded overflow-hidden">
-              {pwHelp.error && <p className="p-4 text-sm text-[#a32020]">{pwHelp.error}</p>}
-              {pwHelp.list.length === 0 && !pwHelp.error && <p className="p-4 text-sm text-leise">Keine offenen Anfragen.</p>}
-              {pwHelp.list.map(r => (
-                <div key={r.id} className="px-4 py-3 border-b border-linie last:border-0 flex items-start gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-tinte font-mono">{r.identity}</p>
-                    <p className="text-xs text-leise mt-0.5">
-                      {new Date(r.createdAt).toLocaleString('de-DE')} · {r.source === 'public' ? 'Anmeldebildschirm' : 'aus dem Portal'}
-                      {r.contact && ` · Rückruf: ${r.contact}`}
-                      {r.ticket && ` · ${r.ticket.key}`}
-                    </p>
-                    {r.note && <p className="text-sm text-gedimmt mt-1">{r.note}</p>}
-                  </div>
-                  {r.status === 'open' ? (
-                    <button onClick={() => closePwHelp(r.id)}
-                      className="px-3 py-1.5 border border-[#d8d4cd] text-gedimmt hover:bg-flaeche rounded text-sm transition-colors whitespace-nowrap">
-                      Erledigt
-                    </button>
-                  ) : (
-                    <span className="text-xs text-leise whitespace-nowrap">
-                      erledigt von {r.closedBy}
-                    </span>
-                  )}
                 </div>
               ))}
             </div>

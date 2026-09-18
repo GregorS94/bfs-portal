@@ -23,13 +23,6 @@ sofort mit echten Gerätedaten.
 Ende zu Ende geprüft: Klick im UI → Exit 0 → das Journal auf dem Zielgerät
 schrumpfte von 9,4 MB auf 8,0 MB.
 
-**Passwort vergessen, ohne Anmeldung.** Am laufenden System durchgespielt:
-Zwölf Anfragen von derselben Adresse ergaben genau fünf Einträge, alle zwölf
-Antworten waren wortgleich — die Begrenzung greift, ohne sich zu verraten. Ein
-formal ungültiger Anmeldename liefert 400, ein gültiger immer 202. Die IT sieht
-den Arbeitsvorrat unter `/it`, „Erledigt" schreibt `password.help.closed` mit
-der freigebenden Person ins Audit-Log. Zurückgesetzt wird dabei nichts.
-
 **Zweiter Anmeldeweg (`simple`).** Geprüft: ohne Token 401, mit gültigem Token
 die eigene Kennung, nach einem geänderten Zeichen im Token 401, Rolle `user`
 bekommt auf der IT-Route 403 und eine Kennung aus `ENTRA_IT_USERS` die Rolle
@@ -51,14 +44,13 @@ Token). Fehlen nur die beiden IDs eines echten Mandanten.
 **Atlassian.** Confluence-Suche und Jira-Ticket, 13 Prüfungen gegen die
 Attrappe plus die echten Endpunkte im ausgerollten Container.
 
-**Konten.** Drei AD-Aktionen im Backend, 8 Prüfungen. Entra-Treiber für die
-SSPR-Triage, 7 Prüfungen.
-
 **Einstellungen über die Oberfläche.** 11 Prüfungen. Live gegengeprüft, dass
 ein Token in keiner Antwort und in keinem Audit-Eintrag auftaucht.
 
-**Vier-Augen bei Kontoaktionen.** `reset_ad_password` und `unlock_ad_account`
-können nicht von der anfragenden Person freigegeben werden. 20 Prüfungen.
+**Vier-Augen für Aktionen an fremden Konten.** Die anfragende Person kann
+einen solchen Auftrag nicht selbst freigeben. 17 Prüfungen. Seit dem
+2026-09-17 nutzt keine ausgerollte Aktion die Regel mehr — sie wird mit einer
+Prüfaktion belegt, damit sie beim nächsten Bedarf sofort greift.
 
 **Audit-Log verkettet.** Jeder Eintrag trägt den Hash seines Vorgängers;
 Änderungen und Löschungen werden sichtbar. Aufbewahrungsfrist über
@@ -82,13 +74,10 @@ Seitenkörper nachgeladen und aus dem XHTML Fließtext gemacht.
 ## Offen
 
 1. **Zwei Entra-IDs** eines echten Mandanten — dann ist die Anmeldung scharf.
-2. **AD-Aktionen sind weiterhin nicht auslösbar.** `reset_ad_password`,
-   `unlock_ad_account` und `get_ad_account_status` sind definiert, geprüft und
-   mit Vier-Augen belegt — aber `createJob()` wird nur aus dem Chat heraus
-   aufgerufen, und dort sind sie mit `chat: false` ausgeschlossen. Die
-   Passwort-Hilfe legt jetzt den Arbeitsvorrat an; was fehlt, ist der Knopf im
-   IT-Bereich, der aus einer Anfrage den Auftrag macht. Erst damit läuft die
-   Vier-Augen-Freigabe im laufenden Portal statt nur im Test.
+2. ~~AD-Aktionen sind nicht auslösbar.~~ **Entfallen.** Die Kontoaktionen und
+   die Passwort-Hilfe sind am 2026-09-17 auf Gregors Entscheidung hin
+   vollständig entfernt worden. Der Umfang ist jetzt Chat und Prüfung am
+   Gerät; siehe [`FAHRPLAN.md`](FAHRPLAN.md).
 3. **bConnect am echten Server prüfen.** Verifiziert ist nur gegen die
    Attrappe, inzwischen in beiden Fassungen (`node tools/bconnect-test.js`,
    37 Prüfungen). Die Schnittstellenfragen sind seit 2026-09-17 beantwortet —

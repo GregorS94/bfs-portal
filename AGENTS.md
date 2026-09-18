@@ -51,7 +51,7 @@ git add -A && git commit && git push
 ```
 
 ```bash
-for t in actions atlassian entra settings approval audit agents simple-auth password-help agent-allowlist; do
+for t in actions atlassian settings approval audit agents simple-auth agent-allowlist bconnect; do
   node tools/$t-test.js || break
 done
 ```

@@ -12,24 +12,6 @@ fehlende Konfiguration eines Fremdsystems → `503`.
 | GET | `/api/config` | Entra-Werte für das Frontend zur Laufzeit |
 | GET | `/api/health/services` | Status aller Abhängigkeiten — siehe unten |
 | POST | `/api/auth/simple` | einfache Anmeldung, nur im Modus `simple` — sonst `404` |
-| POST | `/api/public/password-help` | „Passwort vergessen" vom Anmeldebildschirm |
-
-### `POST /api/public/password-help`
-
-Die einzige offene Route, die etwas anlegt. Body: `identity` (Pflicht),
-`contact`, `note`.
-
-Die Antwort ist **immer dieselbe** — `202` mit einem neutralen Text, auch bei
-unbekanntem Konto und auch, wenn die Begrenzung greift. Ein abweichender Status
-wäre ein Orakel, mit dem sich alle Anmeldenamen des Hauses durchprobieren
-liessen. Nur ein formal ungültiger Anmeldename liefert `400`; daraus lässt sich
-nichts über den Bestand ableiten.
-
-Es wird **nichts zurückgesetzt.** Es entsteht ein Eintrag im Arbeitsvorrat der
-IT (und, falls Jira konfiguriert ist, ein Ticket). Die IT prüft die Identität
-ausserhalb des Portals und löst danach `reset_ad_password` aus — freigegeben
-von einer zweiten Person.
-
 ## Anmeldung
 
 | Methode | Pfad | Rolle | Zweck |
@@ -65,24 +47,6 @@ oder `off`. Siehe [CONFIGURATION.md](CONFIGURATION.md).
 | GET | `/api/knowledge?q=` | user | Confluence-Volltextsuche über CQL |
 | POST | `/api/tickets` | user | Jira-Ticket anlegen (eines je Gespräch) |
 | GET | `/api/tickets/:key` | it | Ticketstatus |
-
-## Passwort-Hilfe
-
-| Methode | Pfad | Rolle | Zweck |
-|---------|------|-------|-------|
-| POST | `/api/self-service/password-help` | user | derselbe Weg aus der angemeldeten Sitzung; die Kennung kommt aus der Sitzung, nicht aus dem Formular |
-| GET | `/api/password-requests` | it | Arbeitsvorrat |
-| POST | `/api/password-requests/:id/close` | it | Anfrage als erledigt markieren |
-
-## Konten
-
-| Methode | Pfad | Rolle | Zweck |
-|---------|------|-------|-------|
-| GET | `/api/entra/sspr?upn=` | it | SSPR-Triage über Microsoft Graph |
-
-Liefert `isSsprEnabled`, `isSsprRegistered`, `isSsprCapable` und
-`methodsRegistered`. Das Zurücksetzen selbst ist bewusst nicht implementiert —
-siehe [`SECURITY.md`](SECURITY.md).
 
 ## Administration
 

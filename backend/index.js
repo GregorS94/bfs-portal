@@ -5,7 +5,6 @@ const Anthropic = require('@anthropic-ai/sdk');
 
 const { toolDefinitions, resolveCommand, ACTIONS } = require('./actions');
 const bconnect = require('./drivers/bconnect');
-const entra = require('./drivers/entra');
 const atlassian = require('./drivers/atlassian');
 const portalTools = require('./portal-tools');
 const settings = require('./settings');
@@ -171,6 +170,12 @@ app.post('/api/auth/login', auth.requireUser, (req, res) => {
 });
 app.get('/api/auth/me', auth.requireUser, (req, res) => res.json({ user: req.user }));
 
+// Absenderkennung fuer das Audit-Log. Das Backend vertraut genau einem
+// Zwischenschritt (`app.set('trust proxy', 1)`) — nginx.
+function clientKey(req) {
+  return String(req.ip || req.socket?.remoteAddress || 'unbekannt');
+}
+
 // --- Einfache Anmeldung --------------------------------------------------------
 //
 // Nur im Modus 'simple'. Der Nutzer behauptet eine Kennung, niemand prueft sie.
@@ -187,104 +192,6 @@ app.post('/api/auth/simple', (req, res) => {
   const role = auth.roleFromName(identity);
   store.audit('auth.simple.login', { identity, role, verified: false, remote: clientKey(req) });
   res.json({ token: auth.signSimpleToken(identity), user: { id: identity, displayName: identity, role, authenticated: false, authMode: 'simple' } });
-});
-
-// --- Passwort vergessen --------------------------------------------------------
-//
-// Diese Route ist die einzige ohne Anmeldung, die etwas anlegt — sie muss es
-// sein, denn wer sein Passwort vergessen hat, kommt nicht herein. Daraus folgen
-// drei Regeln, die hier bewusst zusammenstehen:
-//
-//   1. Die Antwort ist immer dieselbe. Sie verraet nie, ob es das Konto gibt.
-//      Sonst waere das ein Verzeichnis aller Anmeldenamen des Hauses.
-//   2. Begrenzung je Absender, sonst legt ein Skript beliebig viele Anfragen an.
-//   3. Es wird NICHTS zurueckgesetzt. Es entsteht nur ein Arbeitsvorrat fuer die
-//      IT, die die Identitaet ausserhalb des Portals prueft und danach
-//      reset_ad_password ausloest — mit Vier-Augen-Freigabe.
-
-const RATE_MAX = Number(process.env.PUBLIC_RATE_MAX || 5);
-const RATE_WINDOW_MS = Number(process.env.PUBLIC_RATE_WINDOW_MINUTES || 15) * 60 * 1000;
-const rateHits = new Map();
-
-function clientKey(req) {
-  return String(req.ip || req.socket?.remoteAddress || 'unbekannt');
-}
-
-function rateLimited(req) {
-  const key = clientKey(req);
-  const now = Date.now();
-  const hits = (rateHits.get(key) || []).filter((t) => now - t < RATE_WINDOW_MS);
-  if (hits.length >= RATE_MAX) {
-    rateHits.set(key, hits);
-    return true;
-  }
-  hits.push(now);
-  rateHits.set(key, hits);
-  return false;
-}
-
-// Immer dieselbe Auskunft, egal was passiert ist. Bewusst kurz und ohne
-// Bedingung: ein "wenn es das Konto gibt" laedt zum Ruecksschluss ein, und wie
-// die Identitaet geprueft wird, sagt die IT beim Rueckruf.
-const NEUTRAL = { message: 'Danke. Der IT-Support meldet sich bei dir.' };
-
-async function takePasswordRequest(req, res, source, identity) {
-  const contact = String(req.body?.contact || '').trim().slice(0, 120);
-  const note = String(req.body?.note || '').trim().slice(0, 500);
-
-  const entry = store.createPasswordRequest({ identity, contact, note, source, remote: clientKey(req) });
-  store.audit('password.help.requested', {
-    requestId: entry.id, identity, source, hasContact: Boolean(contact), remote: clientKey(req)
-  });
-
-  // Jira ist optional. Ohne Jira bleibt die Anfrage im Portal sichtbar, statt
-  // dass die Funktion ganz ausfaellt.
-  if (atlassian.jiraReady()) {
-    try {
-      const ticket = await atlassian.createTicket({
-        summary: `Passwort-Hilfe: ${identity}`,
-        description:
-          'Jemand hat über den Anmeldebildschirm um Hilfe beim Passwort gebeten. ' +
-          'Die Identität ist NICHT geprüft. Bitte ausserhalb des Portals verifizieren, ' +
-          'danach reset_ad_password auslösen (Freigabe durch eine zweite Person nötig).',
-        context: { Anmeldename: identity, Rückruf: contact, Anmerkung: note, Weg: source },
-        labels: ['passwort-hilfe']
-      });
-      store.attachTicket(entry.id, ticket);
-      store.audit('ticket.created', { key: ticket.key, by: 'passwort-hilfe', requestId: entry.id });
-    } catch (err) {
-      console.warn('Ticket für Passwort-Hilfe fehlgeschlagen:', err.message);
-    }
-  }
-  res.status(202).json(NEUTRAL);
-}
-
-app.post('/api/public/password-help', async (req, res) => {
-  const identity = String(req.body?.identity || '').trim();
-  if (!auth.IDENTITY.test(identity)) {
-    return res.status(400).json({ error: 'Bitte einen gültigen Anmeldenamen eingeben.' });
-  }
-  // Die Begrenzung antwortet ebenfalls neutral: auch "zu viele Versuche" waere
-  // ein Signal, mit dem sich Namen durchprobieren lassen.
-  if (rateLimited(req)) return res.status(202).json(NEUTRAL);
-  await takePasswordRequest(req, res, 'public', identity);
-});
-
-// Derselbe Weg aus der angemeldeten Sitzung. Hier ist die Kennung bekannt, sie
-// wird deshalb nicht aus dem Formular uebernommen.
-app.post('/api/self-service/password-help', auth.requireUser, async (req, res) => {
-  await takePasswordRequest(req, res, 'portal', req.user.id);
-});
-
-app.get('/api/password-requests', auth.requireUser, auth.requireRole('it'), (req, res) => {
-  res.json({ requests: store.listPasswordRequests() });
-});
-
-app.post('/api/password-requests/:id/close', auth.requireUser, auth.requireRole('it'), (req, res) => {
-  const entry = store.closePasswordRequest(req.params.id, req.user.id);
-  if (!entry) return res.status(404).json({ error: 'Anfrage nicht gefunden.' });
-  store.audit('password.help.closed', { requestId: entry.id, identity: entry.identity, by: req.user.id });
-  res.json({ request: entry });
 });
 
 async function allDevices() {
@@ -310,8 +217,7 @@ app.get('/api/admin/settings', auth.requireUser, auth.requireRole('admin'), (req
     settings: settings.redactAll(),
     ready: {
       atlassian: atlassian.isConfigured(),
-      jira: atlassian.jiraReady(),
-      entra: entra.isConfigured()
+      jira: atlassian.jiraReady()
     }
   });
 });
@@ -319,8 +225,6 @@ app.get('/api/admin/settings', auth.requireUser, auth.requireRole('admin'), (req
 app.put('/api/admin/settings/:group', auth.requireUser, auth.requireRole('admin'), (req, res) => {
   try {
     const view = settings.update(req.params.group, req.body || {});
-    // Sonst liefe der Treiber weiter mit dem Token zum alten Geheimnis.
-    entra.resetTokenCache();
     const changed = Object.keys(req.body || {}).filter((k) => settings.SCHEMA[req.params.group]?.[k]);
     store.audit('settings.updated', {
       group: req.params.group,
@@ -337,14 +241,6 @@ app.put('/api/admin/settings/:group', auth.requireUser, auth.requireRole('admin'
 app.post('/api/admin/settings/:group/test', auth.requireUser, auth.requireRole('admin'), async (req, res) => {
   const group = req.params.group;
   try {
-    if (group === 'entra') {
-      if (!entra.isConfigured()) throw new Error('Entra ist nicht vollständig konfiguriert.');
-      entra.resetTokenCache();
-      // Ein Benutzer, den es sicher nicht gibt: prüft Token und Berechtigung,
-      // ohne echte Kontodaten anzufassen.
-      await entra.getSsprStatus('probe.nicht.vorhanden@invalid.test');
-      return res.json({ ok: true, detail: 'Anmeldung und Leseberechtigung in Ordnung.' });
-    }
     if (group === 'atlassian') {
       if (!atlassian.isConfigured()) throw new Error('Atlassian ist nicht vollständig konfiguriert.');
       const hits = await atlassian.searchKnowledge('test', 1);
@@ -437,28 +333,6 @@ app.get('/api/tickets/:key', auth.requireUser, auth.requireRole('it'), async (re
     res.json({ ticket: await atlassian.getTicket(req.params.key) });
   } catch (err) {
     res.status(/Ungültiger/.test(err.message) ? 400 : 502).json({ error: err.message });
-  }
-});
-
-// Kann sich dieser Anrufer selbst helfen? Bewusst nur für die IT: die Antwort
-// verrät, ob es ein Konto gibt und welche Verfahren daran hängen.
-app.get('/api/entra/sspr', auth.requireUser, auth.requireRole('it'), async (req, res) => {
-  const upn = String(req.query.upn || '');
-  if (!entra.UPN.test(upn)) return res.status(400).json({ error: 'Ungültiger UPN.' });
-  if (!entra.isConfigured()) {
-    return res.status(503).json({ error: 'Entra-Graph ist nicht konfiguriert.' });
-  }
-  try {
-    const status = await entra.getSsprStatus(upn);
-    store.audit('entra.sspr.checked', {
-      upn,
-      found: status.found,
-      capable: status.isSsprCapable === true,
-      by: req.user?.id || req.user?.email || 'unbekannt'
-    });
-    res.json({ status, triage: entra.triage(status) });
-  } catch (err) {
-    res.status(502).json({ error: err.message });
   }
 });
 

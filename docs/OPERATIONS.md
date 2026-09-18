@@ -29,18 +29,23 @@ der echten Systeme nachbauen. Das genügt, um Filterlogik, Maskierung und
 Injektionsabwehr zu prüfen — und kostet keine echten Tickets.
 
 ```bash
-node tools/actions-test.js      #  8 Prüfungen: AD-Aktionen, Eingabevalidierung
-node tools/atlassian-test.js    # 16 Prüfungen: CQL, ADF, Ticket-Wiederverwendung
-node tools/entra-test.js        #  7 Prüfungen: SSPR-Triage, OData-Injektion
-node tools/settings-test.js     # 11 Prüfungen: Geheimnisse, Vorrang, Rollen
-node tools/approval-test.js     # 20 Prüfungen: Freigaberechte, Vier-Augen
-node tools/audit-test.js        # 18 Prüfungen: Hash-Kette, Aufbewahrung
-node tools/agents-test.js       # 22 Prüfungen: Geräte-Token, Sperren
-node tools/simple-auth-test.js  # 24 Prüfungen: einfacher Anmeldeweg, Fälschung, Ablauf
-node tools/password-help-test.js # 20 Prüfungen: Passwort-Anfragen, Neustart
+node tools/actions-test.js        #  6 Prüfungen: Aktionsumfang, Eingabevalidierung
+node tools/atlassian-test.js      # 16 Prüfungen: CQL, ADF, Ticket-Wiederverwendung
+node tools/settings-test.js       # 12 Prüfungen: Geheimnisse, Vorrang, Rollen
+node tools/approval-test.js       # 17 Prüfungen: Freigaberechte, Vier-Augen
+node tools/audit-test.js          # 18 Prüfungen: Hash-Kette, Aufbewahrung
+node tools/agents-test.js         # 22 Prüfungen: Geräte-Token, Sperren
+node tools/simple-auth-test.js    # 24 Prüfungen: einfacher Anmeldeweg, Fälschung, Ablauf
+node tools/agent-allowlist-test.js #    Portal- und Agenten-Freigabeliste im Abgleich
+node tools/bconnect-test.js       # 37 Prüfungen: beide Fassungen, Job-Zustände
 ```
 
-Alle sieben laufen ohne Server und ohne installierte Abhängigkeiten.
+Alle neun laufen ohne Server und ohne installierte Abhängigkeiten.
+
+`agent-allowlist-test.js` verdient dabei besondere Beachtung: er vergleicht die
+Freigabeliste in `backend/actions.js` mit der im Agenten. Wird eine Aktion
+entfernt und die Liste im Agenten nicht nachgezogen, erlaubt der Agent etwas,
+was das Portal nie schickt — genau das hat der Test am 2026-09-17 gefunden.
 
 **Ablehnungsprüfungen müssen den Grund prüfen, nicht nur den Fehlschlag.**
 Sonst bestehen sie auch dann, wenn die Aktion gar nicht ausgerollt ist.

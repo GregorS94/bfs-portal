@@ -1,6 +1,6 @@
 # Fahrplan
 
-Stand 2026-09-17. Der Zustandsbericht steht in [`STATUS.md`](STATUS.md); hier
+Stand 2026-09-18. Der Zustandsbericht steht in [`STATUS.md`](STATUS.md); hier
 steht, was in welcher Reihenfolge zu tun ist und **wer dafür gebraucht wird**.
 
 Das ist die eigentliche Ordnung: nicht nach Aufwand, sondern danach, an wem ein
@@ -10,19 +10,22 @@ Schritt hängt. Was niemanden außer uns braucht, kommt zuerst.
 
 ## Stufe 0 — hängt an niemandem
 
-### 0.1 Der fehlende Knopf im IT-Bereich
+### 0.1 ~~Der fehlende Knopf im IT-Bereich~~ — erledigt durch Streichung
 
-**Der wichtigste offene Punkt am Code.** `reset_ad_password`,
-`unlock_ad_account` und `get_ad_account_status` sind definiert, geprüft und mit
-Vier-Augen belegt — aber **nicht auslösbar**: `createJob()` wird nur aus dem
-Chat gerufen, und dort sind die drei mit `chat: false` ausgeschlossen. Die
-Passwort-Hilfe legt den Arbeitsvorrat an, was fehlt, ist der Knopf im
-IT-Bereich, der aus einer Anfrage einen Auftrag macht.
+Am 2026-09-18 anders gelöst als geplant: Die Kontoaktionen und die
+Passwort-Hilfe sind **aus dem Umfang genommen** worden. Damit entfällt der
+Knopf, statt gebaut zu werden.
 
-Solange der fehlt, läuft die Vier-Augen-Freigabe nur im Test, nie im Portal.
-Und ohne ihn ist Stufe 1 keine nutzbare Anwendung, sondern eine Chat-Oberfläche.
+**Der Umfang ist jetzt: Chat und Prüfung am Gerät.** Acht Aktionen
+(sechs lesende Diagnosen, `restart_service`, `clear_journal_logs`), dazu
+Wissenssuche und Ticket über Atlassian.
 
-*Wer:* niemand außer uns. *Abhängig von:* nichts.
+Entfernt wurden: die drei AD-Kontoaktionen, die öffentliche Passwort-Hilfe
+samt Arbeitsvorrat und Begrenzung, der Microsoft-Graph-Treiber für die
+SSPR-Triage und die zugehörigen Oberflächen. Die Vier-Augen-Regel in
+`approval.js` **bleibt** — sie ist die sicherheitsrelevanteste Entscheidung im
+Portal und wird mit einer Prüfaktion belegt, damit sie beim nächsten Einbau
+einer Aktion für fremde Konten sofort greift.
 
 ### 0.2 Portal auf SRV-SSP01
 
@@ -70,30 +73,27 @@ Schritt 11.
 
 ## Stufe 2 — Zugriff auf Geräte
 
-### 2.1 Ein Agent auf einem Domänenrechner
+### 2.1 Der Agent auf einem echten Windows-Rechner
 
-Für Kontosperre und Passwortrücksetzung. **Nicht auf den Arbeitsplätzen** —
-`Get-ADUser` und `Unlock-ADAccount` brauchen irgendeinen Rechner in der Domäne
-mit RSAT. Einer genügt.
+Das ist jetzt der einzige Punkt in Stufe 2 — und der größte ungedeckte des
+ganzen Projekts: **es ist nie etwas auf Windows gelaufen.** Die Linux-Varianten
+der acht Aktionen sind erprobt, die PowerShell-Varianten nicht. Ungeprüft ist
+insbesondere die Argumentübergabe: der Agent gibt Parameter als eigene
+argv-Elemente weiter (`$args[0]`), nie im Skripttext. Ob das unter Windows über
+`CreateProcess` so ankommt, wie es soll, lässt sich nur dort feststellen.
 
-Dabei zu klären: der Agent läuft als `SYSTEM`, also unter dem Computerkonto.
-Das darf im AD lesen, aber weder entsperren noch Passwörter setzen. Es braucht
-eine Delegation auf die betreffende OU oder ein eigenes Dienstkonto auf diesem
-einen Rechner.
+Ein einzelner Testrechner genügt dafür. Erst danach lohnt die Verteilung in die
+Fläche mit `agent/install-windows.ps1`, Token je Gerät und allem, was daran
+hängt.
 
-*Wer:* AD-Administration. *Abhängig von:* 0.1 und Stufe 1.
+**Der Agent läuft mit Systemrechten.** Das ist der Sinn der Übung — Diagnose
+und Reparatur brauchen sie. Die Absicherung liegt deshalb vollständig in der
+Freigabeliste, nicht in den Rechten des Prozesses: der Agent vergleicht jeden
+PowerShell-Skripttext Zeichen für Zeichen mit seiner eigenen Liste und
+vertraut dem Portal ausdrücklich nicht. `tools/agent-allowlist-test.js` hält
+beide Listen im Abgleich.
 
-### 2.2 Diagnose auf den Arbeitsplätzen
-
-Platte voll, Dienst hängt, Speicher knapp — dafür muss der Agent dort laufen,
-wo der Anwender sitzt. Das ist der teure Teil: Verteilung, Token je Gerät,
-`agent/install-windows.ps1`.
-
-**Und hier ist bis heute nie etwas auf Windows gelaufen.** Die Linux-Varianten
-sind erprobt, die PowerShell-Varianten nicht. Vor allem anderen gehört der
-Agent einmal auf einen echten Windows-Rechner.
-
-*Wer:* jemand mit einem Windows-Testrechner. *Abhängig von:* 2.1.
+*Wer:* jemand mit einem Windows-Testrechner. *Abhängig von:* Stufe 1.
 
 ---
 

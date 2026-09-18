@@ -121,115 +121,13 @@ const ACTIONS = {
       file: 'powershell.exe',
       args: ['-NoProfile', '-NonInteractive', '-Command', 'Clear-EventLog -LogName Application']
     })
-  },
-
-  // --- Konten im lokalen AD ------------------------------------------------
-  // Hybrid: bei synchronisierten Konten ist das lokale AD die maßgebliche
-  // Quelle. Hier gesetzt, wandert das Passwort per Hash-Sync nach Entra —
-  // umgekehrt nur, wenn Password Writeback lizenziert und aktiv ist.
-  // Es gibt bewusst keine Linux-Variante: ohne Domäne gibt es kein Konto.
-  // Diese drei Aktionen sind nicht im Chat wählbar (`chat: false`) — sie
-  // gehören in den IT-Bereich, und ihre Ausgabe darf nicht ins Modell zurück.
-
-  get_ad_account_status: {
-    risk: 'read',
-    chat: false,
-    description:
-      'Zeigt den Zustand eines AD-Kontos: gesperrt, aktiv, Passwort abgelaufen, letzte Anmeldung.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        identity: { type: 'string', description: 'Anmeldename oder UPN des Kontos' }
-      },
-      required: ['identity'],
-      additionalProperties: false
-    },
-    validate: (p) => (AD_IDENTITY.test(p.identity || '') ? null : 'Ungültiger Kontoname.'),
-    windows: (p) => ({
-      file: 'powershell.exe',
-      args: [
-        '-NoProfile',
-        '-NonInteractive',
-        '-Command',
-        'Get-ADUser -Identity $args[0] -Properties LockedOut,Enabled,PasswordExpired,' +
-          'PasswordLastSet,LastLogonDate | Select-Object SamAccountName,Enabled,LockedOut,' +
-          'PasswordExpired,PasswordLastSet,LastLogonDate | Format-List',
-        p.identity
-      ]
-    })
-  },
-
-  unlock_ad_account: {
-    risk: 'write',
-    chat: false,
-    fourEyes: true,
-    description:
-      'Hebt die Sperre eines AD-Kontos auf. Das Passwort bleibt unverändert.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        identity: { type: 'string', description: 'Anmeldename oder UPN des Kontos' }
-      },
-      required: ['identity'],
-      additionalProperties: false
-    },
-    validate: (p) => (AD_IDENTITY.test(p.identity || '') ? null : 'Ungültiger Kontoname.'),
-    windows: (p) => ({
-      file: 'powershell.exe',
-      args: [
-        '-NoProfile',
-        '-NonInteractive',
-        '-Command',
-        'Unlock-ADAccount -Identity $args[0] -Confirm:$false; ' +
-          '"Konto {0} entsperrt." -f $args[0]',
-        p.identity
-      ]
-    })
-  },
-
-  reset_ad_password: {
-    risk: 'write',
-    chat: false,
-    fourEyes: true,
-    description:
-      'Setzt ein neues Einmal-Passwort für ein AD-Konto und erzwingt die Änderung ' +
-      'bei der nächsten Anmeldung.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        identity: { type: 'string', description: 'Anmeldename oder UPN des Kontos' }
-      },
-      required: ['identity'],
-      additionalProperties: false
-    },
-    validate: (p) => (AD_IDENTITY.test(p.identity || '') ? null : 'Ungültiger Kontoname.'),
-    // Das Passwort entsteht auf dem Zielrechner und steht nur in der Ausgabe.
-    // Es geht nie durch die Parameter — die landen im Audit-Log (jobs.js,
-    // 'job.created'), die Ausgabe dagegen nur als Byte-Zahl.
-    windows: (p) => ({
-      file: 'powershell.exe',
-      args: [
-        '-NoProfile',
-        '-NonInteractive',
-        '-Command',
-        "$b = [byte[]]::new(18); " +
-          "[Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); " +
-          "$pw = 'Bfs!' + [Convert]::ToBase64String($b).TrimEnd('=').Replace('/','x').Replace('+','y'); " +
-          'Set-ADAccountPassword -Identity $args[0] -Reset ' +
-          '-NewPassword (ConvertTo-SecureString $pw -AsPlainText -Force) -Confirm:$false; ' +
-          'Set-ADUser -Identity $args[0] -ChangePasswordAtLogon $true; ' +
-          'Unlock-ADAccount -Identity $args[0] -Confirm:$false; ' +
-          '"Einmal-Passwort fuer {0}: {1}" -f $args[0], $pw',
-        p.identity
-      ]
-    })
   }
 };
 
 // Baut die Werkzeugliste für die Claude-API aus derselben Quelle.
-// Aktionen mit `chat: false` bleiben draußen: Kontoaktionen gehören in den
-// IT-Bereich, und ihre Ausgabe (Einmal-Passwort) darf nicht als tool_result
-// zurück ins Modell und von dort in den Chatverlauf.
+// `chat: false` schliesst eine Aktion vom Chat aus. Derzeit nutzt das keine
+// Aktion; der Filter bleibt, weil er die Stelle markiert, an der eine Aktion
+// ausdruecklich nicht ins Modell gehoert.
 function toolDefinitions() {
   return Object.entries(ACTIONS)
     .filter(([, a]) => a.chat !== false)

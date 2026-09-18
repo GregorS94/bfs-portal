@@ -70,7 +70,7 @@ Drei Stufen, aufsteigend: **user → it → admin**.
 
 | Rolle | Sieht | Darf |
 |---|---|---|
-| `user` (Mitarbeiter) | Chat, Passwort, Software | chatten, Diagnosen auslösen, **eigene** Aktionen freigeben |
+| `user` (Mitarbeiter) | Chat, Software | chatten, Diagnosen auslösen, **eigene** Aktionen freigeben |
 | `it` (IT-Support) | + Geräte, Audit-Log | fremde Aufträge einsehen und freigeben |
 | `admin` | + Status | alles |
 
