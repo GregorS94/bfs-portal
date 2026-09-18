@@ -208,6 +208,41 @@ damit bestätigt, was der Treiber ohnehin annahm. Die Attrappe spricht jetzt die
 echten Zustände; `tools/bconnect-test.js` prüft alle sechzehn einzeln
 (37 Prüfungen).
 
+### Der Kiosk — vollständig belegt
+
+Aus `bConnect_Jobs.json`, nicht mehr aus der Modulbeschreibung. Acht
+Endpunkte; der eine, auf den es ankommt:
+
+    POST /v2.0/KioskReleases
+
+Der Rumpf hat **genau zwei Pflichtfelder**: `assignmentTargetId` und
+`jobDefinitionId`. Mehr braucht eine Freigabe nicht. Zurückziehen geht über
+`DELETE /v2.0/KioskReleases/{id}`, und es gibt Leseendpunkte je AD-Objekt, je
+Endgerät, je logischer Gruppe und je Jobdefinition.
+
+Das Ziel einer Freigabe ist eines von sechs: `ADObject`, `WindowsEndpoint`,
+`LogicalGroup`, `AndroidEndpoint`, `IosEndpoint`, `MacEndpoint`. Eine Freigabe
+an ein AD-Objekt gilt also für die Person, nicht für ein bestimmtes Gerät —
+der Anwender meldet sich am Kiosk an und wählt aus, was für ihn freigegeben
+ist.
+
+**Die nötigen Rechte stehen wörtlich in der Beschreibung:**
+`JobAssignTarget` auf der Jobdefinition und `SystemOrAdObjectAssignJob` auf
+dem Zuweisungsziel. Das ist eine deutlich engere Rechtebitte an die bMS-Seite
+als „darf Jobs auf beliebigen Geräten ausführen" — ein Argument, das in einem
+Gespräch mit der Systemadministration zählt.
+
+**Warum das aufsichtsrechtlich interessant ist:** Das Portal führt nichts aus.
+Es *erlaubt*, und der Anwender entscheidet selbst, ob und wann. Freigabe und
+Ausführung liegen in verschiedenen Händen, ohne dass wir dafür ein
+Vier-Augen-Verfahren bauen müssten — der Kiosk trennt sie von sich aus.
+
+**Was es nicht ist:** ein Beitrag zur Diagnose. Der Kiosk beantwortet keine
+einzige Frage nach dem Zustand eines Geräts. Er wäre ein **dritter**
+Anwendungsfall neben Chat und Gerätediagnose — Softwarewünsche —, und ob der
+dazukommt, ist eine Produktentscheidung, keine technische. Der Aufwand im
+Treiber selbst wäre klein: ein POST mit zwei Feldern.
+
 ### Bleibt offen
 
 Wie mit `Rescheduled`, `WaitingForUser`, `MaintenanceWindow` und `Delayed`
