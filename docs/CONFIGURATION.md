@@ -45,6 +45,23 @@ Volume wie das Audit-Log. Treiber lesen bei jedem Zugriff frisch — eine
 | `LOCAL_ADMIN_USER` / `LOCAL_ADMIN_PASSWORD` | `admin` / `admin` | Startkonto mit Rolle `admin` |
 | `LOCAL_USER_USER` / `LOCAL_USER_PASSWORD` | `user` / `1234` | Startkonto mit Rolle `user` |
 
+**Die Startpasswörter sind fest.** Niemand wird beim ersten Anmelden zu einer
+Änderung gezwungen — das war eine ausdrückliche Entscheidung (Gregor,
+2026-10-18). Das Portal zeigt in der Kontenliste nur einen Hinweis
+„Startpasswort", solange das ausgelieferte Passwort noch gilt; beim Umzug in
+den Betrieb soll `admin/admin` nicht unbemerkt weiterlaufen. Gesät werden die
+Konten einmalig, wenn die Tabelle leer ist. Zurücksetzen auf die Werte oben:
+
+```bash
+docker compose cp tools backend:/tmp/tools
+docker compose exec backend node /tmp/tools/startpasswoerter.js        # beide
+docker compose exec backend node /tmp/tools/startpasswoerter.js admin  # nur eines
+```
+
+Das beendet laufende Sitzungen der betroffenen Konten. Beim Start passiert es
+bewusst **nicht** — ein Neustart darf niemals das Passwort eines echten
+Administrators überschreiben.
+
 **Vier Anmeldewege, genau einer ist zu jeder Zeit aktiv.** Das Backend meldet
 den aktiven Weg unter `GET /api/config` als `mode`:
 

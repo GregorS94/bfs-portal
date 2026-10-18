@@ -111,6 +111,7 @@ Kiosk. Einzelheiten und Belege in [BARAMUNDI.md](BARAMUNDI.md).
 | POST | `/api/kiosk/requests/:id/release` | it | freigeben (`assignmentTargetId` Pflicht) |
 | POST | `/api/kiosk/requests/:id/deny` | it | ablehnen (`note`) |
 | POST | `/api/kiosk/requests/:id/withdraw` | it | Freigabe zurückziehen |
+| GET | `/api/kiosk/targets?q=` | it | Zuweisungsziele im Verzeichnis suchen (`GET /v2.0/ADUsers`, `/v2.0/ADObjects`). Jede Suche wird protokolliert |
 
 Die angeforderte Jobkennung wird gegen den Katalog aufgelöst, nicht übernommen:
 Sonst könnte jemand eine beliebige Jobdefinition anfordern, und die IT gäbe sie

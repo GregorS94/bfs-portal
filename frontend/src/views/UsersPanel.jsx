@@ -166,7 +166,11 @@ export default function UsersPanel() {
             </select>
 
             {u.mustChange && (
-              <span className="text-[10px] uppercase font-bold tracking-wide text-[#8a5200] bg-[#fdf3e2] ring-1 ring-[#e9c98f] rounded px-1.5 py-0.5">
+              // Hinweis, kein Zwang: die Startpasswoerter sind fest. Sichtbar
+              // bleibt es, damit beim Umzug in den Betrieb niemand uebersieht,
+              // dass `admin/admin` noch gilt.
+              <span title="Dieses Konto hat noch das ausgelieferte Passwort. Niemand muss es ändern — gut zu wissen ist es trotzdem."
+                className="text-[10px] uppercase font-bold tracking-wide text-[#8a5200] bg-[#fdf3e2] ring-1 ring-[#e9c98f] rounded px-1.5 py-0.5">
                 Startpasswort
               </span>
             )}

@@ -172,6 +172,7 @@ ob etwas gesetzt ist.
 | [`docs/FAHRPLAN.md`](docs/FAHRPLAN.md) | Was in welcher Reihenfolge zu tun ist, und wer dafür gebraucht wird |
 | [`docs/SELF_SUPPORT_LANDKARTE.md`](docs/SELF_SUPPORT_LANDKARTE.md) | Welche Self-Support-Bausteine BFS schon hat und wo das Portal hingehört |
 | [`docs/BARAMUNDI.md`](docs/BARAMUNDI.md) | bConnect: was geht, was nicht, und warum zurückgestellt |
+| [`docs/BARAMUNDI_V2_ENDPUNKTE.md`](docs/BARAMUNDI_V2_ENDPUNKTE.md) | alle 265 bConnect-v2-Endpunkte, Herleitung und Messwerkzeug |
 
 ## Tests
 

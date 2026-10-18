@@ -31,9 +31,17 @@
 //   Listen antworten mit { data: [...] } (Select-bCPageData.ps1).
 //   Feldnamen in Kleinschreibung: id, displayName, state.
 //
+// Seit 2026-10-18 liegt die vollstaendige v2-Oberflaeche belegt vor: 265
+// Endpunkte in zwoelf Bereichen, mechanisch aus dem von baramundi signierten
+// PowerShell-Modul `bConnectV2` gelesen (docs/BARAMUNDI_V2_ENDPUNKTE.md).
+// Damit sind die beiden Luecken geschlossen, die hier vorher als "nicht
+// woertlich belegt" standen: die Leseendpunkte des Kiosk und der Weg vom
+// Anmeldenamen zum Zuweisungsziel.
+//
 // ACHTUNG: gegen einen echten bMS-Server ungetestet — beide Fassungen.
 // Verifiziert ist der Treiber nur gegen einen Nachbau (tools/bconnect-mock.js),
-// der diese Request-Formen spricht.
+// der diese Request-Formen spricht. Was die echte Installation hergibt, misst
+// `tools/bconnect-entdecken.js` (nur lesend).
 
 const https = require('https');
 const { URL } = require('url');
@@ -373,11 +381,19 @@ async function execute(deviceId, action, params = {}) {
 //   POST   /v2.0/KioskReleases        { assignmentTargetId, jobDefinitionId }
 //   DELETE /v2.0/KioskReleases/{id}
 //
-// Beide Formen stehen woertlich in der Beschreibung. Die Leseendpunkte (je
-// AD-Objekt, je Endgeraet, je logischer Gruppe, je Jobdefinition) sind dort
-// genannt, ihre Pfade liegen uns aber nicht woertlich vor — deshalb liest das
-// Portal seine Freigaben aus der eigenen Datenbank und nicht aus der bMS. Wer
-// die Pfade belegen kann, kann das hier nachziehen.
+// Die Leseendpunkte liegen seit 2026-10-18 ebenfalls woertlich vor:
+//
+//   GET /v2.0/KioskReleases                                  (blaetterbar)
+//   GET /v2.0/KioskReleases/{id}
+//   GET /v2.0/JobDefinitions/{jobDefinitionId}/KioskReleases
+//   GET /v2.0/ADObjects/{adObjectId}/KioskReleases
+//   GET /v2.0/Endpoints/{endpointId}/KioskReleases
+//   GET /v2.0/LogicalGroups/{logicalGroupId}/KioskReleases
+//
+// Fuehrend bleibt trotzdem die eigene Tabelle: sie haelt fest, WER wann WARUM
+// angefordert hat — das weiss die bMS nicht, sie kennt nur die Freigabe. Die
+// Leseendpunkte dienen dem Abgleich (`listKioskReleases`), nicht der
+// Buchfuehrung.
 //
 // Aufsichtsrechtlich ist das der angenehme Weg: Das Portal fuehrt nichts aus,
 // es erlaubt. Ausfuehren tut der Anwender im Kiosk. Freigabe und Ausfuehrung
@@ -441,6 +457,82 @@ async function deleteKioskRelease(id) {
 }
 
 
+/**
+ * Die Freigaben, die die bMS selbst fuehrt — zum Abgleich mit der eigenen
+ * Tabelle. Ohne `jobDefinitionId` alle, mit ihr nur die zu einer Software.
+ *
+ * Belegt: GET /v2.0/KioskReleases und
+ * GET /v2.0/JobDefinitions/{jobDefinitionId}/KioskReleases.
+ */
+async function listKioskReleases({ jobDefinitionId = '', pageSize = 200 } = {}) {
+  if (!kioskReady()) throw new Error('Der Kiosk ist nicht konfiguriert.');
+  const pfad = jobDefinitionId
+    ? `/JobDefinitions/${encodeURIComponent(jobDefinitionId)}/KioskReleases`
+    : '/KioskReleases';
+  // Die vier Listenparameter heissen in jeder v2-Liste gleich: Page, PageSize,
+  // OrderBy, SearchQuery. Hier genuegt die erste Seite — mehr als ein paar
+  // hundert Freigaben zu einer Software gibt es nicht, und der Abgleich darf
+  // nicht minutenlang blaettern.
+  const antwort = await v2('jobs', `${pfad}?PageSize=${encodeURIComponent(pageSize)}`);
+  return listeAus(antwort).map((f) => ({
+    id: String(f.id ?? f.Id ?? ''),
+    jobDefinitionId: String(f.jobDefinitionId ?? f.JobDefinitionId ?? ''),
+    assignmentTargetId: String(f.assignmentTargetId ?? f.AssignmentTargetId ?? '')
+  }));
+}
+
+// --- Zuweisungsziele ----------------------------------------------------------
+//
+// `assignmentTargetId` ist die Kennung eines AD-Objekts, einer logischen Gruppe
+// oder eines Endgeraets. Bisher musste die IT sie von Hand aus dem bMC
+// heraussuchen und eintippen — eine GUID abschreiben ist genau die Art Arbeit,
+// bei der man sich vertippt.
+//
+// Der Bereich `activedirectory` kann das nachschlagen:
+//   GET /v2.0/ADUsers?SearchQuery=<text>&PageSize=<n>
+//   GET /v2.0/ADObjects?SearchQuery=<text>
+// `SearchQuery` ist eine Freitextsuche, kein Filterausdruck (Samples des
+// Herstellermoduls).
+//
+// Die FELDNAMEN der Antwort sind im Modul nicht modelliert — nur die Rumpfe
+// zum Anlegen sind es. Deshalb werden mehrere Kandidaten gelesen und die
+// uebrigen Schluessel als `felder` mitgegeben: dann sieht man in der
+// Oberflaeche sofort, wie die eigene Installation sie nennt, statt zu raten.
+const ZIEL_NAME = ['samAccountName', 'userPrincipalName', 'logonName', 'accountName',
+  'name', 'displayName', 'distinguishedName'];
+
+function zielAus(roh) {
+  const id = String(roh.id ?? roh.Id ?? roh.guid ?? roh.Guid ?? '');
+  const name = ZIEL_NAME.map((k) => roh[k]).find((v) => typeof v === 'string' && v.trim());
+  return { id, name: name || '(ohne Namen)', felder: Object.keys(roh) };
+}
+
+/**
+ * Sucht Zuweisungsziele zu einem Anmeldenamen oder Objektnamen.
+ *
+ * @param {string} suche Anmeldename, Anzeigename oder Teil davon
+ * @returns {Promise<{quelle: string, ziele: Array<{id: string, name: string, felder: string[]}>}[]>}
+ */
+async function findAssignmentTargets(suche, { pageSize = 10 } = {}) {
+  if (!istV2() || !isConfigured()) throw new Error('Zuweisungsziele lassen sich nur über bConnect v2 suchen.');
+  const text = String(suche || '').trim();
+  if (text.length < 2) throw new Error('Bitte mindestens zwei Zeichen suchen.');
+  const q = `?SearchQuery=${encodeURIComponent(text)}&PageSize=${encodeURIComponent(pageSize)}`;
+
+  // Benutzer und Objekte getrennt abfragen und einzeln scheitern lassen: ist
+  // der AD-Teil nicht lizenziert, soll nicht die ganze Suche sterben.
+  const gruppen = [];
+  for (const [quelle, pfad] of [['AD-Benutzer', '/ADUsers'], ['AD-Objekt', '/ADObjects']]) {
+    try {
+      const antwort = await v2('activedirectory', `${pfad}${q}`);
+      gruppen.push({ quelle, ziele: listeAus(antwort).map(zielAus).filter((z) => z.id) });
+    } catch (err) {
+      gruppen.push({ quelle, ziele: [], problem: err.message });
+    }
+  }
+  return gruppen;
+}
+
 // interpretState wird mit ausgegeben, damit die Zustandstabelle einzeln
 // prüfbar ist, ohne für jeden der sechzehn Zustände einen Lauf zu bauen.
 module.exports = {
@@ -457,5 +549,7 @@ module.exports = {
   kioskWebUrl,
   listKioskJobs,
   createKioskRelease,
-  deleteKioskRelease
+  deleteKioskRelease,
+  listKioskReleases,
+  findAssignmentTargets
 };

@@ -260,8 +260,7 @@ app.post('/api/auth/local', async (req, res) => {
       displayName: konto.displayName || konto.username,
       role: konto.role,
       authenticated: true,
-      authMode: 'local',
-      mustChangePassword: konto.mustChange
+      authMode: 'local'
     }
   });
 });
@@ -320,7 +319,8 @@ app.get('/api/admin/users', ...nurAdmin, async (req, res) => {
     res.json({
       users: liste,
       // Solange ein ausgeliefertes Passwort noch gilt, sagt die Oberflaeche es
-      // deutlich. `must_change` ist der Marker dafuer.
+      // deutlich. `must_change` ist der Marker dafuer — ein Hinweis, kein
+      // Zwang: die Startpasswoerter sind auf Wunsch fest.
       defaultsPending: liste.filter((u) => u.mustChange).map((u) => u.username),
       roles: accounts.ROLES
     });
@@ -373,9 +373,10 @@ app.post('/api/admin/users/:id/password', ...nurAdmin, async (req, res) => {
   try {
     const ziel = await users.findById(req.params.id);
     if (!ziel) return res.status(404).json({ error: 'Konto unbekannt.' });
-    // Vom Administrator gesetzte Passwoerter gelten als vorlaeufig: der Inhaber
-    // muss sie beim naechsten Anmelden aendern.
-    await users.setPassword(ziel.id, neu, { mustChange: true });
+    // Kein Aenderungszwang: ein vom Administrator gesetztes Passwort ist ein
+    // richtiges Passwort, kein Startwert. Der Merker fuer "noch ausgeliefert"
+    // wird hier also geloescht.
+    await users.setPassword(ziel.id, neu, { mustChange: false });
     store.audit('user.password.reset', { identity: ziel.username, by: req.user.id });
     res.json({ ok: true });
   } catch (err) {
@@ -473,6 +474,27 @@ app.post('/api/kiosk/requests/:id/withdraw', auth.requireUser, auth.requireRole(
       releaseId: anforderung.releaseId, by: req.user.id
     });
     res.json({ request: anforderung });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Zuweisungsziele nachschlagen. Nur die IT darf das: es liest Namen aus dem
+// Unternehmensverzeichnis, und das ist keine Information fuer jeden
+// Mitarbeiter. Der Weg ist seit 2026-10-18 belegt (GET /v2.0/ADUsers im
+// Bereich `activedirectory`, siehe docs/BARAMUNDI_V2_ENDPUNKTE.md) — bisher
+// musste die IT die GUID aus dem bMC abschreiben.
+app.get('/api/kiosk/targets', auth.requireUser, auth.requireRole('it'), async (req, res) => {
+  try {
+    const gruppen = await bconnect.findAssignmentTargets(String(req.query.q || ''));
+    // Was nachgeschlagen wurde, gehoert ins Log: eine Verzeichnissuche ist ein
+    // Zugriff auf Personendaten, auch wenn nur eine Kennung herauskommt.
+    store.audit('kiosk.targets.searched', {
+      query: String(req.query.q || '').slice(0, 100),
+      hits: gruppen.reduce((n, g) => n + g.ziele.length, 0),
+      by: req.user.id
+    });
+    res.json({ groups: gruppen });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

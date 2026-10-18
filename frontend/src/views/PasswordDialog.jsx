@@ -4,7 +4,7 @@ import { changeOwnPassword } from '../auth';
 
 // Eigenes Passwort ändern. Das alte wird mit abgefragt — sonst genügt ein
 // fremder, offen stehender Browser, um das Konto zu übernehmen.
-export default function PasswordDialog({ onClose, onDone, pflicht = false }) {
+export default function PasswordDialog({ onClose, onDone }) {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [wieder, setWieder] = useState('');
@@ -33,18 +33,12 @@ export default function PasswordDialog({ onClose, onDone, pflicht = false }) {
         <div className="flex items-center gap-2 mb-1">
           <KeyRound size={16} className="text-akzent" />
           <h2 className="font-semibold text-tinte">Passwort ändern</h2>
-          {/* Bei Pflicht gibt es kein Schliessen: sonst klickt man das
-              Startpasswort einfach weg und es bleibt für immer stehen. */}
-          {!pflicht && (
-            <button onClick={onClose} className="ml-auto text-leise hover:text-tinte" aria-label="Schließen">
-              <X size={16} />
-            </button>
-          )}
+          <button onClick={onClose} className="ml-auto text-leise hover:text-tinte" aria-label="Schließen">
+            <X size={16} />
+          </button>
         </div>
         <p className="text-xs text-leise mb-4">
-          {pflicht
-            ? 'Dein Konto hat noch das ausgelieferte Passwort. Bitte jetzt ändern.'
-            : 'Andere offene Sitzungen dieses Kontos werden dabei beendet.'}
+          Andere offene Sitzungen dieses Kontos werden dabei beendet.
         </p>
 
         <div className="space-y-3">
@@ -75,12 +69,10 @@ export default function PasswordDialog({ onClose, onDone, pflicht = false }) {
             className="px-4 py-2 bg-akzent hover:bg-akzent-hell disabled:bg-[#ddd8d1] disabled:text-leise text-white rounded text-sm font-medium transition-colors">
             {busy ? 'Wird gesetzt…' : 'Ändern'}
           </button>
-          {!pflicht && (
-            <button onClick={onClose}
-              className="px-4 py-2 text-gedimmt hover:bg-flaeche border border-[#d8d4cd] rounded text-sm transition-colors">
-              Abbrechen
-            </button>
-          )}
+          <button onClick={onClose}
+            className="px-4 py-2 text-gedimmt hover:bg-flaeche border border-[#d8d4cd] rounded text-sm transition-colors">
+            Abbrechen
+          </button>
         </div>
       </div>
     </div>

@@ -16,8 +16,6 @@ declare global {
         role?: string;
         /** Zeilennummer in `portal_users` — nur beim Anmeldeweg 'local'. */
         accountId?: number;
-        /** Startpasswort noch nicht geaendert — nur beim Anmeldeweg 'local'. */
-        mustChangePassword?: boolean;
         [weiteres: string]: unknown;
       };
       /** Setzt `requireAgent`, nachdem es das Geraetetoken geprueft hat. */

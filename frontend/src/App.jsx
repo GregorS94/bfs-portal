@@ -74,9 +74,8 @@ export default function App() {
     const signedIn = await localSignIn(username, password);
     setUser(signedIn);
     setAuthenticated(true);
-    // Startpasswort noch drin: der Dialog geht gleich auf und ist nicht
-    // wegklickbar.
-    if (signedIn.mustChangePassword) setPasswortOffen(true);
+    // Kein Zwangsdialog: die Startpasswoerter sind fest. Wer sein Passwort
+    // aendern will, findet den Knopf in der Seitenspalte.
   };
 
   if (!authenticated) {
@@ -168,13 +167,6 @@ export default function App() {
           {area.subtitle && <p className="text-xs text-leise">{area.subtitle}</p>}
         </div>
 
-        {user?.mustChangePassword && !passwortOffen && (
-          <div className="px-6 py-2.5 bg-[#fdf3e2] border-b border-[#e9c98f] text-[#8a5200] text-sm flex items-center gap-3">
-            <span>Dieses Konto hat noch das ausgelieferte Passwort.</span>
-            <button onClick={() => setPasswortOffen(true)} className="underline font-medium">jetzt ändern</button>
-          </div>
-        )}
-
         {allowed ? <Body /> : (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
@@ -192,12 +184,8 @@ export default function App() {
 
       {passwortOffen && (
         <PasswordDialog
-          pflicht={Boolean(user?.mustChangePassword)}
           onClose={() => setPasswortOffen(false)}
-          onDone={() => {
-            setPasswortOffen(false);
-            setUser((u) => ({ ...u, mustChangePassword: false }));
-          }}
+          onDone={() => setPasswortOffen(false)}
         />
       )}
     </div>

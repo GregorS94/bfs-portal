@@ -29,8 +29,14 @@ const CONFIG = {
 
 // Die Startkonten. Bewusst schwach und bewusst in der Konfiguration sichtbar:
 // Gregor hat `admin/admin` und `user/1234` ausdruecklich so bestellt
-// (2026-10-18). Beide Konten werden mit `must_change` angelegt, damit die
-// Oberflaeche unmissverstaendlich dazu auffordert, sie zu aendern.
+// (2026-10-18) — und ausdruecklich als *feste* Passwoerter, die niemand beim
+// ersten Anmelden aendern muss.
+//
+// `must_change` bleibt trotzdem gesetzt, aber nur als Merker: "dieses Konto
+// hat noch das ausgelieferte Passwort". Es erzwingt nichts. Der
+// Administrationsbereich zeigt das als Hinweis an, damit beim Umzug in den
+// Betrieb nicht unbemerkt `admin/admin` weiterlaeuft. Zurueckgesetzt werden
+// die Startpasswoerter mit `tools/startpasswoerter.js`.
 const SEEDS = [
   {
     username: process.env.LOCAL_ADMIN_USER || 'admin',

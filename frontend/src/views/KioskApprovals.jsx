@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, CheckCircle, XCircle, Undo2 } from 'lucide-react';
+import { RefreshCw, CheckCircle, XCircle, Undo2, Search } from 'lucide-react';
 import { authedFetch } from '../auth';
 
 // Software-Anforderungen freigeben. Das Zuweisungsziel trägt die IT ein: die
-// Kennung des AD-Objekts oder Geräts, für das die Freigabe gelten soll. Das
-// Portal kann sie nicht aus dem Anmeldenamen ableiten — dafür wären die
-// AD-Leseendpunkte von bConnect nötig, deren Pfade uns nicht wörtlich
-// vorliegen. Geraten wird hier nichts; siehe docs/BARAMUNDI.md.
+// Kennung des AD-Objekts oder Geräts, für das die Freigabe gelten soll.
+//
+// Seit 2026-10-18 muss sie dafür keine GUID mehr aus dem bMC abschreiben: die
+// Suche fragt `GET /v2.0/ADUsers` und `/v2.0/ADObjects` im bConnect-Bereich
+// `activedirectory` (belegt in docs/BARAMUNDI_V2_ENDPUNKTE.md) und füllt das
+// Feld mit der gefundenen Kennung. Automatisch zugewiesen wird trotzdem
+// nichts — die Auswahl bleibt eine Entscheidung der IT.
 const ZUSTAND_LABEL = {
   requested: 'offen', released: 'freigegeben', denied: 'abgelehnt', withdrawn: 'zurückgezogen'
 };
@@ -14,7 +17,24 @@ const ZUSTAND_LABEL = {
 export default function KioskApprovals() {
   const [state, setState] = useState({ requests: [], loading: true, error: null });
   const [ziel, setZiel] = useState({});
+  const [treffer, setTreffer] = useState({});
   const [meldung, setMeldung] = useState(null);
+
+  // Verzeichnissuche für eine einzelne Anforderung. Der Anmeldename der
+  // Anforderung ist der naheliegende Suchtext — im Verzeichnis kann er aber
+  // anders heißen, deshalb ist das Feld frei überschreibbar.
+  const suche = async (r) => {
+    const text = (ziel[r.id] || r.username || '').trim();
+    setTreffer((t) => ({ ...t, [r.id]: { laeuft: true } }));
+    try {
+      const res = await authedFetch(`/api/kiosk/targets?q=${encodeURIComponent(text)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      setTreffer((t) => ({ ...t, [r.id]: { groups: data.groups || [] } }));
+    } catch (err) {
+      setTreffer((t) => ({ ...t, [r.id]: { error: err.message } }));
+    }
+  };
 
   const load = async () => {
     setState((s) => ({ ...s, loading: true }));
@@ -83,8 +103,13 @@ export default function KioskApprovals() {
           </p>
           <div className="flex gap-2 items-center flex-wrap">
             <input value={ziel[r.id] || ''} onChange={(e) => setZiel({ ...ziel, [r.id]: e.target.value })}
+              onKeyDown={(e) => e.key === 'Enter' && suche(r)}
               placeholder="Zuweisungsziel (AD-Objekt oder Gerät)"
               className="px-3 py-2 w-72 bg-white border border-linie rounded text-sm focus:outline-none focus:ring-2 focus:ring-akzent/50" />
+            <button onClick={() => suche(r)} title={`Im Verzeichnis suchen (Vorgabe: ${r.username})`}
+              className="px-3 py-2 min-h-[38px] text-gedimmt hover:bg-flaeche border border-[#d8d4cd] rounded text-sm transition-colors flex items-center gap-1.5">
+              <Search size={15} className={treffer[r.id]?.laeuft ? 'animate-pulse' : ''} /> Suchen
+            </button>
             <button onClick={() => entscheide(r, 'release', { assignmentTargetId: (ziel[r.id] || '').trim() },
               `„${r.jobName}" für ${r.username} freigegeben.`)}
               disabled={!(ziel[r.id] || '').trim()}
@@ -99,6 +124,31 @@ export default function KioskApprovals() {
               <XCircle size={15} /> Ablehnen
             </button>
           </div>
+
+          {treffer[r.id]?.error && (
+            <p className="mt-2 text-xs text-[#a32020]">{treffer[r.id].error}</p>
+          )}
+          {treffer[r.id]?.groups && (
+            <div className="mt-2 border border-linie rounded bg-flaeche p-2">
+              {treffer[r.id].groups.every((g) => !g.ziele.length) && (
+                <p className="text-xs text-leise">Kein Treffer im Verzeichnis.</p>
+              )}
+              {treffer[r.id].groups.map((g) => (
+                <div key={g.quelle} className="mb-1 last:mb-0">
+                  {g.problem && <p className="text-xs text-[#8a5200]">{g.quelle}: {g.problem}</p>}
+                  {g.ziele.map((z) => (
+                    <button key={z.id}
+                      onClick={() => setZiel({ ...ziel, [r.id]: z.id })}
+                      className="w-full text-left px-2 py-1.5 rounded hover:bg-white text-xs flex items-center gap-2">
+                      <span className="text-[10px] uppercase tracking-wide text-leise w-24 flex-shrink-0">{g.quelle}</span>
+                      <span className="text-tinte font-medium">{z.name}</span>
+                      <span className="font-mono text-leise">{z.id}</span>
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       ))}
 

@@ -217,20 +217,28 @@ echten Zustände; `tools/bconnect-test.js` prüft alle sechzehn einzeln
 > `frontend/src/views/KioskPanel.jsx` (Mitarbeiter) und `KioskApprovals.jsx`
 > (IT), Routen in [`API.md`](API.md#kiosk-software-anfordern).
 >
-> Umgesetzt sind genau die beiden Aufrufe, die unten wörtlich belegt sind —
-> POST und DELETE. Die **Leseendpunkte sind nicht umgesetzt**: sie sind in der
-> Beschreibung genannt, ihre Pfade liegen uns aber nicht wörtlich vor. Das
-> Portal führt seine Freigaben deshalb in der eigenen Tabelle
-> `kiosk_requests`. Wer die Pfade belegen kann, kann das nachziehen.
+> **Nachtrag 2026-10-18, zweite Runde.** Die beiden Lücken, die hier standen,
+> sind zu. Das signierte PowerShell-Modul `bConnectV2` aus der PowerShell
+> Gallery ist mit *openapi-generator* aus der echten
+> Schnittstellenbeschreibung erzeugt; daraus sind alle 265 v2-Endpunkte
+> mechanisch auslesbar. Vollständige Liste und Herleitung:
+> [`BARAMUNDI_V2_ENDPUNKTE.md`](BARAMUNDI_V2_ENDPUNKTE.md).
 >
-> Das **Zuweisungsziel trägt die IT bei der Freigabe ein.** Es aus dem
-> Anmeldenamen abzuleiten würde bedeuten, das AD-Objekt des Nutzers in der bMS
-> nachzuschlagen — auch dafür fehlen die wörtlichen Pfade.
+> * Die **Leseendpunkte des Kiosk** liegen wörtlich vor und sind umgesetzt
+>   (`bconnect.listKioskReleases`) — für den Abgleich. Führend bleibt die
+>   eigene Tabelle `kiosk_requests`: sie hält fest, *wer wann warum*
+>   angefordert hat, und das weiß die bMS nicht.
+> * Das **Zuweisungsziel** lässt sich jetzt nachschlagen statt abschreiben:
+>   `GET /v2.0/ADUsers?SearchQuery=…` im Bereich `activedirectory`, im Portal
+>   als Suchfeld neben der Freigabe (`GET /api/kiosk/targets`). Eingetragen
+>   wird es weiterhin von der IT — die Suche schlägt vor, sie entscheidet
+>   nicht.
 >
 > Geprüft ist das gegen die Attrappe (`node tools/kiosk-test.js`,
-> 15 Prüfungen) und im Ablauf gegen einen echten Postgres
+> 22 Prüfungen) und im Ablauf gegen einen echten Postgres
 > (`tools/db-test.js`). **Gegen einen echten bMS-Server ist nichts davon
-> gelaufen.**
+> gelaufen** — was die BFS-Installation wirklich hergibt, misst
+> `tools/bconnect-entdecken.js` (nur lesende Aufrufe).
 
 Aus `bConnect_Jobs.json`, nicht mehr aus der Modulbeschreibung. Acht
 Endpunkte; der eine, auf den es ankommt:

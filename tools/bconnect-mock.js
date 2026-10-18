@@ -37,6 +37,21 @@ const JOBS = [
   { Id: 'job-rollout', Name: 'Windows Feature Update', Comment: 'GEFAEHRLICH - darf der Chat nicht' }
 ];
 
+// AD-Benutzer und -Objekte der Attrappe. Die Feldnamen sind im
+// Herstellermodul NICHT modelliert (nur Rumpfe zum Anlegen sind es), also
+// steht hier eine plausible Form: `samAccountName` als Anmeldename, `id` als
+// Kennung. Genau deshalb liest der Treiber mehrere Kandidaten und gibt die
+// uebrigen Schluessel als `felder` mit — was die echte bMS liefert, misst
+// tools/bconnect-entdecken.js.
+const ADUSERS = [
+  { id: 'ad-0001', samAccountName: 'anna.mueller', displayName: 'Anna Müller', mail: 'anna.mueller@bfs.test' },
+  { id: 'ad-0002', samAccountName: 'bernd.schmidt', displayName: 'Bernd Schmidt', mail: 'bernd.schmidt@bfs.test' }
+];
+
+const ADOBJECTS = [
+  { id: 'ado-0001', name: 'PC-MUELLER', distinguishedName: 'CN=PC-MUELLER,OU=Clients,DC=bfs,DC=test' }
+];
+
 const instances = new Map();
 // Kiosk-Freigaben der Attrappe. Schluessel ist die Kennung, die POST zurueckgibt.
 const kioskReleases = new Map();
@@ -94,6 +109,30 @@ const server = https.createServer(
   }
 );
 
+/** Seitenobjekt, wie v2 es liefert: `data` plus Blaetterangaben. Die
+ *  Parameternamen sind in jeder Liste des Moduls dieselben — Page, PageSize,
+ *  OrderBy, SearchQuery — und `totalPages` liest der Blaetterhelfer. */
+function seite(eintraege, url) {
+  const groesse = Number(url.searchParams.get('PageSize') || 100);
+  const nummer = Number(url.searchParams.get('Page') || 0);
+  const teil = eintraege.slice(nummer * groesse, nummer * groesse + groesse);
+  return {
+    data: teil,
+    page: nummer,
+    pageSize: groesse,
+    totalCount: eintraege.length,
+    totalPages: Math.max(1, Math.ceil(eintraege.length / groesse))
+  };
+}
+
+/** Freitextsuche ueber alle Textfelder — `SearchQuery` ist kein Filterausdruck. */
+function suchen(eintraege, url) {
+  const q = (url.searchParams.get('SearchQuery') || '').toLowerCase();
+  if (!q) return eintraege;
+  return eintraege.filter((e) =>
+    Object.values(e).some((v) => typeof v === 'string' && v.toLowerCase().includes(q)));
+}
+
 /** v2-Zweig. Felder klein, Listen in `data`, Instanz anlegen per POST. */
 function v2(req, res, url) {
   const json = (obj, code = 200) =>
@@ -112,7 +151,20 @@ function v2(req, res, url) {
     return json({ data: SOFTWARE[id] || [] });
   }
   if (ressource === 'JobDefinitions' && !id) {
-    return json({ data: JOBS.map((j) => klein({ ...j, displayName: j.Name })) });
+    return json(seite(JOBS.map((j) => klein({ ...j, displayName: j.Name })), url));
+  }
+  if (ressource === 'JobDefinitions' && befehl === 'KioskReleases' && req.method === 'GET') {
+    return json(seite([...kioskReleases.values()].filter((f) => f.jobDefinitionId === id), url));
+  }
+
+  // --- Active Directory ----------------------------------------------------
+  // GET /v2.0/ADUsers und /v2.0/ADObjects, beide mit Freitextsuche
+  // `SearchQuery` (Samples des Herstellermoduls).
+  if (ressource === 'ADUsers' && req.method === 'GET') {
+    return json(seite(suchen(ADUSERS, url), url));
+  }
+  if (ressource === 'ADObjects' && req.method === 'GET') {
+    return json(seite(suchen(ADOBJECTS, url), url));
   }
 
   // --- Kiosk ---------------------------------------------------------------
@@ -139,6 +191,13 @@ function v2(req, res, url) {
       kioskReleases.delete(id);
       // Der Server antwortet auf DELETE ohne Inhalt.
       return res.writeHead(204).end();
+    }
+    // Leseendpunkte, belegt im Modul bConnectV2.Jobs (2026-10-18):
+    // GET /v2.0/KioskReleases blaetterbar, GET /v2.0/KioskReleases/{id} einzeln.
+    if (!id && req.method === 'GET') return json(seite([...kioskReleases.values()], url));
+    if (id && req.method === 'GET') {
+      const eine = kioskReleases.get(id);
+      return eine ? json(eine) : json({ message: 'unknown release' }, 404);
     }
   }
 
@@ -202,7 +261,7 @@ function leseKoerper(req, weiter) {
 
 const PORT = Number(process.argv[2] || 8443);
 
-module.exports = { server, PORT, USER, PASS, APIKEY, ENDPOINTS, JOBS, SOFTWARE, instances, kioskReleases, ENDZUSTAND };
+module.exports = { server, PORT, USER, PASS, APIKEY, ENDPOINTS, JOBS, SOFTWARE, ADUSERS, ADOBJECTS, instances, kioskReleases, ENDZUSTAND };
 
 // Nur starten, wenn direkt aufgerufen — bconnect-test.js bindet die Attrappe
 // ein und startet sie selbst.

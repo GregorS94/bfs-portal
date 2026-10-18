@@ -4,10 +4,11 @@
 // Aufruf: node tools/kiosk-test.js
 //
 // Was hier NICHT geprüft wird: ob ein echter bMS-Server dieselben Formen
-// spricht. Belegt sind POST /v2.0/KioskReleases mit genau zwei Pflichtfeldern
-// und DELETE /v2.0/KioskReleases/{id} — beides wörtlich aus
-// bConnect_Jobs.json (bMS 26R1), siehe docs/BARAMUNDI.md. Der erste Lauf gegen
-// den echten Server steht aus.
+// spricht. Belegt sind inzwischen alle benutzten Pfade — POST und DELETE
+// /v2.0/KioskReleases, die vier Leseendpunkte und die Verzeichnissuche —
+// mechanisch aus dem signierten Herstellermodul gelesen, siehe
+// docs/BARAMUNDI_V2_ENDPUNKTE.md. Der erste Lauf gegen den echten Server
+// steht aus.
 
 const assert = require('assert');
 const fs = require('fs');
@@ -123,6 +124,52 @@ async function main() {
       /HTTP 401/
     );
     bconnect.CONFIG.apiKey = echt;
+  });
+
+  console.log('\nFreigaben lesen');
+  await check('die bMS listet die eigene Freigabe', async () => {
+    const alle = await bconnect.listKioskReleases();
+    assert.ok(alle.some((f) => f.id === freigabe.id), 'Freigabe fehlt in der Liste');
+  });
+  await check('je Jobdefinition gefiltert', async () => {
+    const gespeichert = mock.kioskReleases.get(freigabe.id);
+    const zumJob = await bconnect.listKioskReleases({ jobDefinitionId: gespeichert.jobDefinitionId });
+    assert.ok(zumJob.length >= 1);
+    assert.ok(zumJob.every((f) => f.jobDefinitionId === gespeichert.jobDefinitionId));
+    // Ein fremder Job darf nichts liefern — sonst filtert der Pfad nicht,
+    // sondern der Zufall.
+    const fremd = await bconnect.listKioskReleases({ jobDefinitionId: 'job-gibtsnicht' });
+    assert.strictEqual(fremd.length, 0);
+  });
+
+  console.log('\nZuweisungsziele suchen');
+  await check('Anmeldename findet den AD-Benutzer mit Kennung', async () => {
+    const gruppen = await bconnect.findAssignmentTargets('anna.mueller');
+    const benutzer = gruppen.find((g) => g.quelle === 'AD-Benutzer');
+    assert.strictEqual(benutzer.ziele.length, 1);
+    assert.strictEqual(benutzer.ziele[0].id, 'ad-0001');
+    assert.strictEqual(benutzer.ziele[0].name, 'anna.mueller');
+    // Die Feldnamen der echten bMS sind unbekannt — deshalb muessen sie
+    // mitkommen, damit man sie in der Oberflaeche ablesen kann statt zu raten.
+    assert.ok(benutzer.ziele[0].felder.includes('samAccountName'));
+  });
+  await check('Teiltreffer über den Anzeigenamen', async () => {
+    const gruppen = await bconnect.findAssignmentTargets('Schmidt');
+    assert.strictEqual(gruppen.find((g) => g.quelle === 'AD-Benutzer').ziele[0].id, 'ad-0002');
+  });
+  await check('Objekte kommen als eigene Gruppe', async () => {
+    const gruppen = await bconnect.findAssignmentTargets('PC-MUELLER');
+    const objekte = gruppen.find((g) => g.quelle === 'AD-Objekt');
+    assert.strictEqual(objekte.ziele[0].id, 'ado-0001');
+  });
+  await check('ein Zeichen wird gar nicht gesucht', async () => {
+    // Sonst liefert eine Freitextsuche das halbe Verzeichnis zurück.
+    await assert.rejects(() => bconnect.findAssignmentTargets('a'), /zwei Zeichen/);
+  });
+  await check('ohne Treffer bleibt die Gruppe leer statt zu scheitern', async () => {
+    const gruppen = await bconnect.findAssignmentTargets('gibtesnichtimverzeichnis');
+    assert.ok(gruppen.every((g) => g.ziele.length === 0));
+    assert.ok(gruppen.every((g) => !g.problem), 'kein Treffer ist kein Fehler');
   });
 
   console.log('\nFreigabe zurückziehen');
