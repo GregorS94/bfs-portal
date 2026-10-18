@@ -91,6 +91,25 @@ Die `id` eines AD-Objekts ist das, was `assignmentTargetId` erwartet. Welches
 Feld der Antwort den Anmeldenamen traegt, ist im Modul nicht modelliert — das
 muss am echten Server abgelesen werden, dafuer ist das Entdeckungswerkzeug da.
 
+## Schnellprobe ohne unser Werkzeug
+
+Auf einem Windows-Rechner im BFS-Netz braucht es dafuer gar nichts von uns —
+das Herstellermodul selbst ist die kuerzeste Probe, ob bConnect antwortet:
+
+```powershell
+Install-Module bConnectV2 -Scope CurrentUser
+$key = Read-Host -Prompt "API-Schluessel" -AsSecureString
+Set-bConnectConfig -ApiKey $key -Hostname "bms.bfs.intern"   # Port anhaengen, falls nicht 443
+Get-bCJobsJobDefinitions -PageSize 5 | Select-bCPageData     # Katalog
+Get-bCJobsKioskReleases  -PageSize 5 | Select-bCPageData     # bestehende Kiosk-Freigaben
+Get-bCActivedirectoryADUsers -SearchQuery "nachname" -PageSize 5 | Select-bCPageData
+```
+
+Kommen hier Zeilen zurueck, ist alles geklaert: bConnect laeuft, der
+Schluessel gilt, und die Feldnamen stehen auf dem Schirm. Kommt ein Fehler,
+sagt er welcher. Das ist der billigste erste Schritt — und er laeuft
+ausschliesslich lesend.
+
 ## Erst messen, dann bauen
 
 ```bash
