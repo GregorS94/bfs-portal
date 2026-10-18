@@ -35,8 +35,12 @@ Anfrage frisch aus der Datenbank. Dazu die Kontenverwaltung in der
 Administration — anlegen, Rolle ändern, sperren, Passwort setzen, löschen — und
 ein Dialog fürs eigene Passwort. Ausgeliefert wird `admin/admin` und
 `user/1234`; beide sind als „muss geändert werden" markiert. 52 Prüfungen ohne
-Datenbank (`tools/accounts-test.js`) und 33 gegen einen echten Postgres
-(`tools/db-test.js`). Was dabei auffiel und behoben ist: ein gekürzter
+Datenbank (`tools/accounts-test.js`) und 39 gegen einen echten Postgres im
+ausgerollten Container (`tools/db-test.js`). Dazu am laufenden System
+durchgespielt: Anmeldung, falsches Passwort (gleiche Meldung wie bei
+unbekanntem Konto), Sperre nach fünf Fehlversuchen, Rollenentzug wirkt ohne
+neues Anmelden, gesperrtes Konto fliegt sofort aus der Sitzung, und die drei
+Selbst-Aussperr-Fälle werden abgewiesen. Was dabei auffiel und behoben ist: ein gekürzter
 Passworthash hätte weiter gepasst, weil die Ausgabe von PBKDF2 präfixstabil
 ist — siehe [`SECURITY.md`](SECURITY.md#der-modus-local-authentifiziert--gegen-das-portal).
 

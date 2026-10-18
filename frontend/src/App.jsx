@@ -13,7 +13,7 @@ import Wortmarke from './Wortmarke';
 const AREAS = [
   { path: '/', name: 'Mitarbeiter', icon: Users, min: 'user', component: UserPortal, subtitle: null },
   { path: '/it', name: 'IT-Support', icon: Wrench, min: 'it', component: ITArea, subtitle: 'Aufträge und Geräte' },
-  { path: '/admin', name: 'Administration', icon: Settings, min: 'admin', component: AdminArea, subtitle: 'Dienste und Konfiguration' }
+  { path: '/admin', name: 'Administration', icon: Settings, min: 'admin', component: AdminArea, subtitle: 'Dienste, Anbindungen, Konten, Logs' }
 ];
 
 const ROLES = ['user', 'it', 'admin'];

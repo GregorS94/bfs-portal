@@ -27,8 +27,11 @@ function view(row) {
 }
 
 async function list() {
+  // Administratoren zuerst, dann IT, dann Mitarbeiter. `ORDER BY role` waere
+  // alphabetisch und damit genau verkehrt herum.
   const { rows } = await db.query(
-    'SELECT * FROM portal_users ORDER BY role DESC, username ASC'
+    `SELECT * FROM portal_users
+      ORDER BY CASE role WHEN 'admin' THEN 0 WHEN 'it' THEN 1 ELSE 2 END, username ASC`
   );
   return rows.map(view);
 }
