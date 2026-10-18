@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { ShieldAlert } from 'lucide-react';
+import { ShieldAlert, KeyRound } from 'lucide-react';
 import Wortmarke from '../Wortmarke';
 
-// Anmeldebildschirm. Zwei Wege, je nach Betriebsart des Backends:
+// Anmeldebildschirm. Drei Wege, je nach Betriebsart des Backends:
 //   entra  — Microsoft 365
+//   local  — Konto und Passwort aus der Datenbank des Portals
 //   simple — nur ein Name, ohne Prüfung (Prototyp)
-export default function LoginScreen({ mode, ready, onSimpleSignIn, onEntraSignIn }) {
+export default function LoginScreen({ mode, ready, onSimpleSignIn, onLocalSignIn, onEntraSignIn }) {
   const [identity, setIdentity] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -20,6 +22,19 @@ export default function LoginScreen({ mode, ready, onSimpleSignIn, onEntraSignIn
     }
     setBusy(false);
   };
+
+  const submitLocal = async () => {
+    setError('');
+    setBusy(true);
+    try {
+      await onLocalSignIn(identity.trim(), password);
+    } catch (err) {
+      setError(err.message);
+    }
+    setBusy(false);
+  };
+
+  const localReady = identity.trim() && password;
 
   const field = 'w-full px-4 py-2.5 bg-white border border-linie text-tinte rounded focus:outline-none focus:ring-2 focus:ring-akzent/50';
 
@@ -37,6 +52,36 @@ export default function LoginScreen({ mode, ready, onSimpleSignIn, onEntraSignIn
             className="w-full px-6 py-2.5 bg-akzent hover:bg-akzent-hell text-white rounded font-medium text-sm transition-colors shadow-lg shadow-black/5">
             Mit Microsoft 365 anmelden
           </button>
+        )}
+
+        {ready && mode === 'local' && (
+          <div className="space-y-3 text-left">
+            <label className="block text-sm text-gedimmt">Anmeldename</label>
+            <input value={identity} autoFocus autoComplete="username"
+              onChange={(e) => setIdentity(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && localReady && submitLocal()}
+              placeholder="admin" className={field} />
+            <label className="block text-sm text-gedimmt">Passwort</label>
+            <input value={password} type="password" autoComplete="current-password"
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && localReady && submitLocal()}
+              placeholder="••••" className={field} />
+            <button onClick={submitLocal} disabled={busy || !localReady}
+              className="w-full px-6 py-2.5 bg-akzent hover:bg-akzent-hell disabled:bg-[#ddd8d1] disabled:text-leise text-white rounded font-medium text-sm transition-colors flex items-center justify-center gap-2">
+              <KeyRound size={15} /> {busy ? 'Anmelden…' : 'Anmelden'}
+            </button>
+            {/* Muss hier stehen und nicht nur in der Dokumentation: solange die
+                ausgelieferten Passwoerter gelten, ist das Portal fuer jeden
+                offen, der diesen Satz kennt. */}
+            <div className="flex gap-2 items-start p-3 rounded bg-[#fdf3e2] border border-[#e9c98f] text-[#8a5200] text-xs">
+              <ShieldAlert size={16} className="shrink-0 mt-0.5" />
+              <span>
+                Prototyp: Geprüft wird gegen die Konten des Portals, nicht gegen das
+                Unternehmensverzeichnis. Die Startkonten <strong>admin/admin</strong> und{' '}
+                <strong>user/1234</strong> sind öffentlich bekannt und gehören im Administrationsbereich geändert.
+              </span>
+            </div>
+          </div>
         )}
 
         {ready && mode === 'simple' && (

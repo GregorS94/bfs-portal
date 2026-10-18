@@ -208,7 +208,29 @@ damit bestätigt, was der Treiber ohnehin annahm. Die Attrappe spricht jetzt die
 echten Zustände; `tools/bconnect-test.js` prüft alle sechzehn einzeln
 (37 Prüfungen).
 
-### Der Kiosk — vollständig belegt
+### Der Kiosk — vollständig belegt und seit 2026-10-18 gebaut
+
+> **Stand der Umsetzung.** Das Portal hat jetzt einen Kiosk-Bereich:
+> Mitarbeiter fordern Software an, die IT gibt frei, das Portal ruft dabei
+> `POST /v2.0/KioskReleases`, und installiert wird im Kiosk. Code in
+> `backend/kiosk.js` und `backend/drivers/bconnect.js`, Oberfläche in
+> `frontend/src/views/KioskPanel.jsx` (Mitarbeiter) und `KioskApprovals.jsx`
+> (IT), Routen in [`API.md`](API.md#kiosk-software-anfordern).
+>
+> Umgesetzt sind genau die beiden Aufrufe, die unten wörtlich belegt sind —
+> POST und DELETE. Die **Leseendpunkte sind nicht umgesetzt**: sie sind in der
+> Beschreibung genannt, ihre Pfade liegen uns aber nicht wörtlich vor. Das
+> Portal führt seine Freigaben deshalb in der eigenen Tabelle
+> `kiosk_requests`. Wer die Pfade belegen kann, kann das nachziehen.
+>
+> Das **Zuweisungsziel trägt die IT bei der Freigabe ein.** Es aus dem
+> Anmeldenamen abzuleiten würde bedeuten, das AD-Objekt des Nutzers in der bMS
+> nachzuschlagen — auch dafür fehlen die wörtlichen Pfade.
+>
+> Geprüft ist das gegen die Attrappe (`node tools/kiosk-test.js`,
+> 15 Prüfungen) und im Ablauf gegen einen echten Postgres
+> (`tools/db-test.js`). **Gegen einen echten bMS-Server ist nichts davon
+> gelaufen.**
 
 Aus `bConnect_Jobs.json`, nicht mehr aus der Modulbeschreibung. Acht
 Endpunkte; der eine, auf den es ankommt:

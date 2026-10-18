@@ -140,6 +140,43 @@ ungeprüften Benutzer wäre die gefährlichere Variante.
 Die Agent-API hängt an einem eigenen Token, nicht an Entra — ein Dienst hat
 keine interaktive Anmeldung.
 
+### Der Modus `local` authentifiziert — gegen das Portal
+
+`LOCAL_LOGIN=true` prüft ein echtes Geheimnis: scrypt (N=16384, r=8, p=1,
+32 Byte) mit eigenem Salz je Konto, Vergleich laufzeitkonstant. Damit ist
+`user.authenticated` hier `true`. Die Einschränkung steht trotzdem in der
+Seitenleiste („Lokales Konto"), denn geprüft wird gegen die portaleigene
+Tabelle und nicht gegen das Unternehmensverzeichnis: wer ein Konto im Portal
+hat, muss nicht derselbe sein wie der Mensch im AD.
+
+Was dazugehört:
+
+- **Die Rolle kommt bei jeder Anfrage aus der Datenbank**, nicht aus dem Token.
+  Ein Entzug wirkt sofort statt erst beim nächsten Anmelden.
+- **Token-Fassung.** Jedes Konto trägt eine Zahl, die das Token mitführt.
+  Passwortänderung und Sperre zählen sie hoch — laufende Sitzungen enden
+  dadurch sofort, ohne eine Liste gültiger Token.
+- **Die Fehlermeldung unterscheidet nicht** zwischen unbekanntem Konto und
+  falschem Passwort. Sonst ist die Anmeldemaske eine Kontenliste.
+- **Bremse gegen Durchprobieren:** fünf Fehlversuche je Kennung *und*
+  Absenderadresse, dann fünf Minuten Sperre. Die Zählung je Adresse ist nötig,
+  damit nicht ein Angreifer durch absichtliche Fehlversuche fremde Konten
+  aussperrt.
+- **Datenbank weg heisst nicht angemeldet** (`503`), nie „durchgelassen".
+- **Die ausgelieferten Passwörter `admin/admin` und `user/1234` sind
+  öffentlich.** Sie stehen in dieser Dokumentation und in der `.env.example`.
+  Für einen Prototyp ist das eine bewusste Entscheidung (Gregor, 2026-10-18);
+  für einen Produktivbetrieb ist es ein Ausschlusskriterium. Beide Konten sind
+  als „muss geändert werden" markiert, der Dialog dazu ist beim ersten
+  Anmelden nicht wegklickbar.
+
+Eine Lücke, die beim Schreiben der Prüfungen auffiel und behoben ist: Der
+letzte Schritt von scrypt ist PBKDF2, dessen Ausgabe **präfixstabil** ist. Ein
+in der Tabelle gekürzter Hash wäre mit der gekürzten Länge nachgerechnet worden
+und hätte weiter gepasst — bei einem Byte mit Wahrscheinlichkeit 1/256. Die
+Prüfung verlangt deshalb genau 32 Byte und übernimmt die Länge nicht aus dem
+gespeicherten Wert.
+
 ### Der Modus `simple` authentifiziert nicht
 
 `SIMPLE_LOGIN=true` erlaubt die Anmeldung mit blossem Namen. Das Backend stellt

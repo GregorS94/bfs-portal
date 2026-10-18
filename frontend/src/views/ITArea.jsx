@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, ShieldAlert, ClipboardList, Wrench, ScrollText } from 'lucide-react';
+import { RefreshCw, ShieldAlert, ClipboardList, Wrench, ScrollText, Package } from 'lucide-react';
 import { authedFetch } from '../auth';
+import AuditPanel from './AuditPanel';
+import KioskApprovals from './KioskApprovals';
 
 // IT-Bereich: Geräte, offene Freigaben, Auftragsverlauf, Audit-Log.
 // Bewusst ohne Chat — der ITler arbeitet hier an Aufträgen, nicht am Dialog.
@@ -8,7 +10,6 @@ export default function ITArea() {
   const [activeTab, setActiveTab] = useState('jobs');
   const [devices, setDevices] = useState({ list: [], loading: false, error: null });
   const [jobs, setJobs] = useState({ list: [], loading: false, error: null });
-  const [audit, setAudit] = useState({ entries: [], loading: false, error: null });
 
   const loadDevices = async () => {
     setDevices(d => ({ ...d, loading: true }));
@@ -22,12 +23,6 @@ export default function ITArea() {
     setJobs({ list: data.jobs || [], loading: false, error: data.error || null });
   };
 
-  const loadAudit = async () => {
-    setAudit(a => ({ ...a, loading: true }));
-    const data = await (await authedFetch('/api/audit')).json();
-    setAudit({ entries: data.entries || [], loading: false, error: data.error || null });
-  };
-
   const decide = async (jobId, approve) => {
     await authedFetch(`/api/jobs/${jobId}/${approve ? 'approve' : 'deny'}`, { method: 'POST' });
     loadJobs();
@@ -36,13 +31,13 @@ export default function ITArea() {
   useEffect(() => {
     if (activeTab === 'devices') loadDevices();
     if (activeTab === 'jobs') loadJobs();
-    if (activeTab === 'audit') loadAudit();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
   const TABS = [
     { id: 'jobs', label: 'Aufträge', icon: ClipboardList },
     { id: 'devices', label: 'Geräte', icon: Wrench },
+    { id: 'kiosk', label: 'Software-Freigaben', icon: Package },
     { id: 'audit', label: 'Audit-Log', icon: ScrollText }
   ];
 
@@ -151,26 +146,9 @@ export default function ITArea() {
           </div>
         )}
 
-        {activeTab === 'audit' && (
-          <div>
-            <button onClick={loadAudit} className="mb-4 px-4 py-2 bg-akzent hover:bg-akzent-hell text-white rounded transition-colors">
-              <><RefreshCw size={14} className={audit.loading ? 'animate-spin' : ''} /> Aktualisieren</>
-            </button>
-            <div className="bg-white border border-linie rounded overflow-hidden">
-              {audit.error && <p className="p-4 text-sm text-[#a32020]">{audit.error}</p>}
-              {audit.entries.length === 0 && !audit.error && <p className="p-4 text-sm text-leise">Noch keine Einträge.</p>}
-              {audit.entries.map((e, i) => (
-                <div key={i} className="px-4 py-2 border-b border-linie last:border-0 text-sm flex gap-3">
-                  <span className="text-leise font-mono text-xs whitespace-nowrap">{new Date(e.ts).toLocaleString('de-DE')}</span>
-                  <span className="font-mono text-xs font-bold text-gedimmt whitespace-nowrap">{e.event}</span>
-                  <span className="text-leise truncate">
-                    {e.action || e.hostname || ''} {e.params ? JSON.stringify(e.params) : ''} {e.approvedBy ? `· freigegeben von ${e.approvedBy}` : ''}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {activeTab === 'kiosk' && <KioskApprovals />}
+
+        {activeTab === 'audit' && <AuditPanel />}
       </div>
     </>
   );

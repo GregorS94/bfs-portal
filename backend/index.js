@@ -9,6 +9,11 @@ const atlassian = require('./drivers/atlassian');
 const portalTools = require('./portal-tools');
 const settings = require('./settings');
 const auth = require('./auth');
+const accounts = require('./accounts');
+const users = require('./users');
+const db = require('./db');
+const kiosk = require('./kiosk');
+const lockout = require('./lockout');
 const store = require('./jobs');
 const agents = require('./agents');
 const { decisionProblem } = require('./approval');
@@ -192,6 +197,285 @@ app.post('/api/auth/simple', (req, res) => {
   const role = auth.roleFromName(identity);
   store.audit('auth.simple.login', { identity, role, verified: false, remote: clientKey(req) });
   res.json({ token: auth.signSimpleToken(identity), user: { id: identity, displayName: identity, role, authenticated: false, authMode: 'simple' } });
+});
+
+// --- Lokale Konten -------------------------------------------------------------
+//
+// Hier wird wirklich ein Passwort geprueft — gegen die Tabelle `portal_users`,
+// nicht gegen das Unternehmensverzeichnis. Zwei Dinge sind dabei Absicht:
+//
+//   * Die Fehlermeldung unterscheidet nicht zwischen „Konto gibt es nicht" und
+//     „Passwort falsch". Sonst ist die Anmeldemaske eine Kontenliste.
+//   * Ein Ausfall der Datenbank fuehrt zu 503, nie zu einer Anmeldung. Ein
+//     stiller Durchlauf waere die Luecke.
+const anmeldeBremse = lockout.createLockout();
+
+app.post('/api/auth/local', async (req, res) => {
+  if (auth.MODE !== 'local') {
+    return res.status(404).json({ error: 'Dieser Anmeldeweg ist nicht aktiv.' });
+  }
+  const username = accounts.normalizeUsername(req.body?.username);
+  const password = String(req.body?.password ?? '');
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Anmeldename und Passwort sind nötig.' });
+  }
+
+  // Je Kennung und je Absender getrennt zaehlen — siehe lockout.js.
+  const schluessel = `${username}|${clientKey(req)}`;
+  const rest = anmeldeBremse.blocked(schluessel);
+  if (rest) {
+    return res.status(429).json({ error: `Zu viele Fehlversuche. Bitte ${rest} Sekunden warten.` });
+  }
+
+  let konto;
+  try {
+    konto = await users.findForLogin(username);
+  } catch (err) {
+    return res.status(503).json({ error: `Kontodatenbank nicht erreichbar: ${err.message}` });
+  }
+
+  const passt = konto ? accounts.verifyPassword(password, konto.passwordHash) : false;
+  if (!konto || !passt || !konto.active) {
+    const gesperrt = anmeldeBremse.fail(schluessel);
+    store.audit('auth.local.failed', {
+      identity: username,
+      // Warum es nicht geklappt hat, steht nur im Log — nicht in der Antwort.
+      reason: !konto ? 'unbekannt' : !passt ? 'passwort' : 'gesperrt',
+      locked: gesperrt,
+      remote: clientKey(req)
+    });
+    return res.status(401).json({ error: 'Anmeldename oder Passwort stimmt nicht.' });
+  }
+
+  anmeldeBremse.reset(schluessel);
+  await users.touchLogin(konto.id);
+  store.audit('auth.local.login', {
+    identity: konto.username, role: konto.role, verified: true, remote: clientKey(req)
+  });
+
+  res.json({
+    token: auth.signLocalToken({ username: konto.username, tokenVersion: konto.tokenVersion }),
+    user: {
+      id: konto.username,
+      displayName: konto.displayName || konto.username,
+      role: konto.role,
+      authenticated: true,
+      authMode: 'local',
+      mustChangePassword: konto.mustChange
+    }
+  });
+});
+
+// Eigenes Passwort aendern. Das alte ist Pflicht — sonst genuegt ein fremder,
+// offen stehender Browser, um das Konto zu uebernehmen.
+app.post('/api/auth/password', auth.requireUser, async (req, res) => {
+  if (auth.MODE !== 'local') {
+    return res.status(400).json({ error: 'Passwörter gibt es nur beim lokalen Anmeldeweg.' });
+  }
+  const aktuell = String(req.body?.current ?? '');
+  const neu = String(req.body?.next ?? '');
+  const problem = accounts.passwordProblem(neu);
+  if (problem) return res.status(400).json({ error: problem });
+  if (neu === aktuell) return res.status(400).json({ error: 'Das neue Passwort ist das alte.' });
+
+  try {
+    const konto = await users.findForLogin(req.user.id);
+    if (!konto || !accounts.verifyPassword(aktuell, konto.passwordHash)) {
+      store.audit('user.password.denied', { identity: req.user.id, remote: clientKey(req) });
+      return res.status(401).json({ error: 'Das aktuelle Passwort stimmt nicht.' });
+    }
+    await users.setPassword(konto.id, neu, { mustChange: false });
+    store.audit('user.password.changed', { identity: konto.username, by: req.user.id });
+    // Das neue Token ersetzt das alte: setPassword zaehlt die Token-Fassung
+    // hoch, damit andere Sitzungen enden. Ohne diese Antwort waere der
+    // Aendernde selbst mit abgemeldet.
+    res.json({
+      ok: true,
+      token: auth.signLocalToken({ username: konto.username, tokenVersion: konto.tokenVersion + 1 })
+    });
+  } catch (err) {
+    res.status(503).json({ error: err.message });
+  }
+});
+
+// --- Benutzerverwaltung ---------------------------------------------------------
+//
+// Wer darf was aendern, entscheidet accounts.changeProblem(). Die Regel steht
+// dort und nicht hier, damit sie ohne Datenbank pruefbar ist — es sind genau
+// die Faelle, in denen sich das Portal selbst aussperrt.
+
+/** Gemeinsamer Vorspann: nur beim lokalen Weg gibt es Konten zu verwalten. */
+function requireLocalMode(req, res, next) {
+  if (auth.MODE !== 'local') {
+    return res.status(400).json({ error: 'Konten gibt es nur beim lokalen Anmeldeweg (LOCAL_LOGIN=true).' });
+  }
+  next();
+}
+
+const nurAdmin = [auth.requireUser, auth.requireRole('admin'), requireLocalMode];
+
+app.get('/api/admin/users', ...nurAdmin, async (req, res) => {
+  try {
+    const liste = await users.list();
+    res.json({
+      users: liste,
+      // Solange ein ausgeliefertes Passwort noch gilt, sagt die Oberflaeche es
+      // deutlich. `must_change` ist der Marker dafuer.
+      defaultsPending: liste.filter((u) => u.mustChange).map((u) => u.username),
+      roles: accounts.ROLES
+    });
+  } catch (err) {
+    res.status(503).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/users', ...nurAdmin, async (req, res) => {
+  const { username, password, role, displayName } = req.body || {};
+  try {
+    const konto = await users.create({ username, password, role, displayName });
+    store.audit('user.created', { identity: konto.username, role: konto.role, by: req.user.id });
+    res.status(201).json({ user: konto });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.patch('/api/admin/users/:id', ...nurAdmin, async (req, res) => {
+  const { role, active, displayName } = req.body || {};
+  try {
+    const ziel = await users.findById(req.params.id);
+    // req.user.accountId kommt aus derselben Tabelle wie `ziel` — damit greift
+    // die Pruefung auf das eigene Konto wirklich.
+    const problem = accounts.changeProblem(
+      { id: req.user.accountId, username: req.user.id },
+      ziel,
+      { role, active },
+      await users.countActiveAdmins()
+    );
+    if (problem) return res.status(400).json({ error: problem });
+
+    const konto = await users.update(req.params.id, { role, active, displayName });
+    store.audit('user.updated', {
+      identity: konto.username,
+      fields: ['role', 'active', 'displayName'].filter((k) => (req.body || {})[k] !== undefined),
+      role: konto.role, active: konto.active, by: req.user.id
+    });
+    res.json({ user: konto });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/users/:id/password', ...nurAdmin, async (req, res) => {
+  const neu = String(req.body?.password ?? '');
+  const problem = accounts.passwordProblem(neu);
+  if (problem) return res.status(400).json({ error: problem });
+  try {
+    const ziel = await users.findById(req.params.id);
+    if (!ziel) return res.status(404).json({ error: 'Konto unbekannt.' });
+    // Vom Administrator gesetzte Passwoerter gelten als vorlaeufig: der Inhaber
+    // muss sie beim naechsten Anmelden aendern.
+    await users.setPassword(ziel.id, neu, { mustChange: true });
+    store.audit('user.password.reset', { identity: ziel.username, by: req.user.id });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/admin/users/:id', ...nurAdmin, async (req, res) => {
+  try {
+    const ziel = await users.findById(req.params.id);
+    if (!ziel) return res.status(404).json({ error: 'Konto unbekannt.' });
+    const problem = accounts.changeProblem(
+      { id: req.user.accountId, username: req.user.id }, ziel, { remove: true },
+      await users.countActiveAdmins()
+    );
+    if (problem) return res.status(400).json({ error: problem });
+
+    await users.remove(ziel.id);
+    store.audit('user.deleted', { identity: ziel.username, role: ziel.role, by: req.user.id });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// --- Kiosk ----------------------------------------------------------------------
+//
+// Das Portal erteilt Freigaben, es installiert nichts. Der Ablauf steht in
+// kiosk.js, die Belege zur Schnittstelle in docs/BARAMUNDI.md.
+
+app.get('/api/kiosk/catalog', auth.requireUser, async (req, res) => {
+  try {
+    res.json(await kiosk.catalog(req.user.id));
+  } catch (err) {
+    res.status(503).json({ error: err.message });
+  }
+});
+
+app.post('/api/kiosk/requests', auth.requireUser, async (req, res) => {
+  try {
+    const anforderung = await kiosk.request({
+      username: req.user.id,
+      jobDefinitionId: req.body?.jobDefinitionId,
+      note: req.body?.note
+    });
+    store.audit('kiosk.requested', {
+      identity: req.user.id, job: anforderung.jobName, jobDefinitionId: anforderung.jobDefinitionId
+    });
+    res.status(201).json({ request: anforderung });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/kiosk/requests', auth.requireUser, auth.requireRole('it'), async (req, res) => {
+  try {
+    res.json({ requests: await kiosk.listAll({ onlyOpen: req.query.open === 'true' }) });
+  } catch (err) {
+    res.status(503).json({ error: err.message });
+  }
+});
+
+app.post('/api/kiosk/requests/:id/release', auth.requireUser, auth.requireRole('it'), async (req, res) => {
+  try {
+    const anforderung = await kiosk.release(req.params.id, {
+      assignmentTargetId: String(req.body?.assignmentTargetId || '').trim(),
+      decidedBy: req.user.id
+    });
+    store.audit('kiosk.released', {
+      identity: anforderung.username, job: anforderung.jobName,
+      assignmentTargetId: anforderung.assignmentTargetId, releaseId: anforderung.releaseId,
+      by: req.user.id
+    });
+    res.json({ request: anforderung });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/kiosk/requests/:id/deny', auth.requireUser, auth.requireRole('it'), async (req, res) => {
+  try {
+    const anforderung = await kiosk.deny(req.params.id, { decidedBy: req.user.id, note: req.body?.note });
+    store.audit('kiosk.denied', { identity: anforderung.username, job: anforderung.jobName, by: req.user.id });
+    res.json({ request: anforderung });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/kiosk/requests/:id/withdraw', auth.requireUser, auth.requireRole('it'), async (req, res) => {
+  try {
+    const anforderung = await kiosk.withdraw(req.params.id, { decidedBy: req.user.id });
+    store.audit('kiosk.withdrawn', {
+      identity: anforderung.username, job: anforderung.jobName,
+      releaseId: anforderung.releaseId, by: req.user.id
+    });
+    res.json({ request: anforderung });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 async function allDevices() {
@@ -405,7 +689,19 @@ app.post('/api/jobs/:id/deny', auth.requireUser, (req, res) => {
 });
 
 app.get('/api/audit', auth.requireUser, auth.requireRole('it'), (req, res) => {
-  res.json({ entries: store.readAudit(200) });
+  // Mehr als 1000 Zeilen gehen nicht: die Antwort wird sonst groesser als die
+  // Oberflaeche darstellen kann, und das Log liegt als Datei vor, nicht als
+  // Datenbank mit Seitenabfrage.
+  const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 1000);
+  res.json({ entries: store.readAudit(limit), limit });
+});
+
+// Zustand der Kette. Der Startlauf prueft sie ohnehin und schreibt das ins
+// Protokoll des Containers — dort sieht es aber niemand, der das Portal
+// benutzt.
+app.get('/api/audit/verify', auth.requireUser, auth.requireRole('admin'), (req, res) => {
+  const chain = store.verifyAudit();
+  res.json({ ok: chain.ok, entries: chain.entries, problems: chain.problems.slice(0, 20) });
 });
 
 // ------------------------------------------------------------------- Chat
@@ -726,8 +1022,19 @@ app.get('/api/health/services', async (req, res) => {
     }
   }
 
+  const datenbank = await db.health();
+
   const services = [
       { key: 'backend', name: 'Portal-Backend', status: 'ok', detail: `Modell ${MODEL}` },
+      { key: 'db', name: 'Datenbank (Postgres)', status: datenbank.status, detail: datenbank.detail },
+      {
+        key: 'kiosk',
+        name: 'baramundi Kiosk',
+        status: bconnect.kioskReady() ? 'ok' : 'off',
+        detail: bconnect.kioskReady()
+          ? `${bconnect.CONFIG.kioskJobs.length} freigebbare Jobs · ${bconnect.kioskWebUrl()}`
+          : 'Aus — BCONNECT_KIOSK_JOBS ist leer oder bConnect fehlt'
+      },
       { key: 'claude', name: 'Claude API', status: claude.ok ? 'ok' : 'error', detail: claude.detail },
       {
         key: 'agent',
@@ -749,6 +1056,17 @@ app.get('/api/health/services', async (req, res) => {
         : auth.publicConfig().configProblems.length
           ? `Unvollständig: ${auth.publicConfig().configProblems.join(', ')}`
           : `Mandant ${auth.CONFIG.tenantId.slice(0, 8)}…`
+    },
+    {
+      key: 'anmeldeweg',
+      name: 'Anmeldeweg',
+      status: auth.MODE === 'off' ? 'warn' : auth.MODE === 'simple' ? 'warn' : 'ok',
+      detail: {
+        entra: 'Entra ID — Identität geprüft',
+        local: 'Lokale Konten mit Passwort (Prototyp, nicht das Unternehmensverzeichnis)',
+        simple: 'Nur Name, KEINE Prüfung — Testbetrieb',
+        off: 'Aus — fester Entwicklungs-Benutzer'
+      }[auth.MODE]
     },
     {
       key: 'agenttoken',
@@ -780,6 +1098,9 @@ app.get('/health', (req, res) => {
     agentTokenConfigured: Boolean(AGENT_TOKEN),
     bconnectConfigured: bconnect.isConfigured(),
     authEnabled: auth.CONFIG.enabled,
+    authMode: auth.MODE,
+    databaseConfigured: db.isConfigured(),
+    databaseReady: db.isReady(),
     devRole: auth.DEV_USER.role
   });
 });
@@ -816,8 +1137,23 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const PORT = Number(process.env.PORT) || 3000;
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, '0.0.0.0', async () => {
   console.log(`✅ Backend läuft auf Port ${PORT} (Modell: ${MODEL}, Aktionen: ${Object.keys(ACTIONS).length})`);
+
+  // Schema anlegen und, falls die Tabelle leer ist, die Startkonten saeen.
+  // Scheitert das, laeuft das Portal weiter — aber der Anmeldeweg 'local'
+  // antwortet dann mit 503 statt jemanden durchzulassen.
+  if (db.isConfigured()) {
+    try {
+      await db.init();
+      console.log(`Datenbank: bereit (Anmeldeweg ${auth.MODE}).`);
+    } catch (err) {
+      console.error(`⚠️  Datenbank nicht erreichbar: ${err.message}`);
+      if (auth.MODE === 'local') console.error('    LOCAL_LOGIN=true — ohne Datenbank kann sich niemand anmelden.');
+    }
+  } else if (auth.MODE === 'local') {
+    console.error('⚠️  LOCAL_LOGIN=true, aber keine Datenbank konfiguriert (DATABASE_URL/DB_HOST).');
+  }
 
   const chain = store.verifyAudit();
   if (chain.ok) {

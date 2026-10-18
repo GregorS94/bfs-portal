@@ -53,7 +53,16 @@ const CONFIG = {
   // Ohne diese Liste ist NICHTS ausführbar. Der bMS-Katalog enthält auch
   // Rollouts und Compliance-Läufe — die gehören nicht in die Hand des Chats.
   allowedJobs: (process.env.BCONNECT_ALLOWED_JOBS || '')
-    .split(',').map((s) => s.trim()).filter(Boolean)
+    .split(',').map((s) => s.trim()).filter(Boolean),
+  // Zweite, unabhaengige Liste: welche Jobs das Portal im Kiosk freigeben
+  // darf. Bewusst getrennt von `allowedJobs` — das eine erlaubt dem Chat, auf
+  // einem Geraet etwas auszufuehren, das andere erlaubt einem Mitarbeiter,
+  // sich selbst etwas zu installieren. Zwei verschiedene Rechte.
+  kioskJobs: (process.env.BCONNECT_KIOSK_JOBS || '')
+    .split(',').map((s) => s.trim()).filter(Boolean),
+  // Adresse der Kiosk-Weboberflaeche. Vorgabe nach Herstellerdokumentation:
+  // {Serveradresse}/bWebServer/Kiosk.
+  kioskUrl: process.env.BCONNECT_KIOSK_URL || ''
 };
 
 const istV2 = () => CONFIG.version.trim().toLowerCase().startsWith('v2');
@@ -353,6 +362,85 @@ async function execute(deviceId, action, params = {}) {
   };
 }
 
+// --- Kiosk --------------------------------------------------------------------
+//
+// Der baramundi Kiosk ist selbst ein Self-Service-Portal: eine Webanwendung
+// unter {Serveradresse}/bWebServer/Kiosk, in der ein Anwender sich freigegebene
+// Jobs selbst zuweist. Das Portal baut das nicht nach. Es erteilt nur die
+// Freigabe — und zwar genau mit dem Aufruf, der in der
+// Schnittstellenbeschreibung steht (`bConnect_Jobs.json`, bMS 26R1):
+//
+//   POST   /v2.0/KioskReleases        { assignmentTargetId, jobDefinitionId }
+//   DELETE /v2.0/KioskReleases/{id}
+//
+// Beide Formen stehen woertlich in der Beschreibung. Die Leseendpunkte (je
+// AD-Objekt, je Endgeraet, je logischer Gruppe, je Jobdefinition) sind dort
+// genannt, ihre Pfade liegen uns aber nicht woertlich vor — deshalb liest das
+// Portal seine Freigaben aus der eigenen Datenbank und nicht aus der bMS. Wer
+// die Pfade belegen kann, kann das hier nachziehen.
+//
+// Aufsichtsrechtlich ist das der angenehme Weg: Das Portal fuehrt nichts aus,
+// es erlaubt. Ausfuehren tut der Anwender im Kiosk. Freigabe und Ausfuehrung
+// liegen damit von sich aus in verschiedenen Haenden.
+//
+// Noetige Rechte auf der bMS-Seite, woertlich aus der Beschreibung:
+// `JobAssignTarget` auf der Jobdefinition, `SystemOrAdObjectAssignJob` auf dem
+// Zuweisungsziel.
+
+/** Nur v2 kennt KioskReleases. Ohne Freigabeliste bleibt der Bereich aus. */
+const kioskReady = () => istV2() && isConfigured() && CONFIG.kioskJobs.length > 0;
+
+/** Adresse der Kiosk-Weboberflaeche — dorthin schickt das Portal den Anwender. */
+function kioskWebUrl() {
+  if (CONFIG.kioskUrl) return CONFIG.kioskUrl.replace(/\/+$/, '');
+  if (!CONFIG.server) return '';
+  return `https://${CONFIG.server}/bWebServer/Kiosk`;
+}
+
+/**
+ * Der Katalog: alle Jobdefinitionen, die fuer den Kiosk freigegeben werden
+ * duerfen. Gefiltert wird gegen `BCONNECT_KIOSK_JOBS` — ohne Eintrag dort ist
+ * nichts anforderbar, auch wenn es im bMS-Katalog steht.
+ */
+async function listKioskJobs() {
+  if (!kioskReady()) return [];
+  const jobs = listeAus(await v2('jobs', '/JobDefinitions'));
+  return jobs
+    .map((j) => ({
+      id: j.Id || j.Guid || j.id,
+      name: j.Name || j.displayName || '',
+      comment: j.Comment || j.comment || j.description || ''
+    }))
+    .filter((j) => CONFIG.kioskJobs.includes(j.name));
+}
+
+/**
+ * Freigabe erteilen. Der Rumpf hat genau zwei Pflichtfelder.
+ *
+ * @param {{assignmentTargetId: string, jobDefinitionId: string}} auftrag
+ * @returns {Promise<{id: string, raw: any}>} Kennung der Freigabe (zum Zurueckziehen) und die Rohantwort
+ */
+async function createKioskRelease({ assignmentTargetId, jobDefinitionId }) {
+  if (!kioskReady()) throw new Error('Der Kiosk ist nicht konfiguriert.');
+  if (!assignmentTargetId || !jobDefinitionId) {
+    throw new Error('assignmentTargetId und jobDefinitionId sind Pflicht.');
+  }
+  const antwort = await v2('jobs', '/KioskReleases', {
+    methode: 'POST',
+    koerper: { assignmentTargetId, jobDefinitionId }
+  });
+  return { id: String(antwort?.id ?? antwort?.Id ?? ''), raw: antwort };
+}
+
+/** Freigabe zuruecknehmen. */
+async function deleteKioskRelease(id) {
+  if (!kioskReady()) throw new Error('Der Kiosk ist nicht konfiguriert.');
+  if (!id) throw new Error('Die Kennung der Freigabe fehlt.');
+  await v2('jobs', `/KioskReleases/${encodeURIComponent(id)}`, { methode: 'DELETE' });
+  return true;
+}
+
+
 // interpretState wird mit ausgegeben, damit die Zustandstabelle einzeln
 // prüfbar ist, ohne für jeden der sechzehn Zustände einen Lauf zu bauen.
 module.exports = {
@@ -364,5 +452,10 @@ module.exports = {
   execute,
   interpretState,
   RISK,
-  CONFIG
+  CONFIG,
+  kioskReady,
+  kioskWebUrl,
+  listKioskJobs,
+  createKioskRelease,
+  deleteKioskRelease
 };

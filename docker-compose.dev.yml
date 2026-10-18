@@ -27,6 +27,9 @@ services:
       - .env
     environment:
       DATA_DIR: /data
+      DB_HOST: ${DB_HOST:-db}
+      DB_NAME: ${DB_NAME:-bfs_portal}
+      DB_USER: ${DB_USER:-portal}
     volumes:
       - audit_data:/data
     ports:
@@ -35,6 +38,22 @@ services:
     volumes:
       - ./backend:/app
     command: sh -c 'npm install --no-audit --no-fund && node index.js'
+
+  db:
+    image: postgres:16-alpine
+    container_name: bfs-portal-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-bfs_portal}
+      POSTGRES_USER: ${DB_USER:-portal}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-entwicklung}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-portal} -d ${DB_NAME:-bfs_portal}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   mock-api:
     image: node:18-alpine
@@ -49,3 +68,4 @@ services:
 
 volumes:
   audit_data:
+  db_data:

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { LogOut, Users, Wrench, Settings } from 'lucide-react';
-import { initAuth, authedFetch, signIn, signOut, account, mode as authMode, simpleSignIn } from './auth';
+import { LogOut, Users, Wrench, Settings, KeyRound } from 'lucide-react';
+import { initAuth, authedFetch, signIn, signOut, account, mode as authMode, simpleSignIn, localSignIn } from './auth';
+import PasswordDialog from './views/PasswordDialog';
 import UserPortal from './views/UserPortal';
 import ITArea from './views/ITArea';
 import AdminArea from './views/AdminArea';
@@ -25,6 +26,7 @@ export default function App() {
   const [authReady, setAuthReady] = useState(false);
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [path, setPath] = useState(window.location.pathname.replace(/\/+$/, '') || '/');
+  const [passwortOffen, setPasswortOffen] = useState(false);
 
   useEffect(() => {
     const onPop = () => setPath(window.location.pathname.replace(/\/+$/, '') || '/');
@@ -68,12 +70,22 @@ export default function App() {
     setAuthenticated(true);
   };
 
+  const onLocalSignIn = async (username, password) => {
+    const signedIn = await localSignIn(username, password);
+    setUser(signedIn);
+    setAuthenticated(true);
+    // Startpasswort noch drin: der Dialog geht gleich auf und ist nicht
+    // wegklickbar.
+    if (signedIn.mustChangePassword) setPasswortOffen(true);
+  };
+
   if (!authenticated) {
     return (
       <LoginScreen
         mode={authMode()}
         ready={authReady && needsSignIn}
         onSimpleSignIn={onSimpleSignIn}
+        onLocalSignIn={onLocalSignIn}
         onEntraSignIn={signIn}
       />
     );
@@ -99,6 +111,13 @@ export default function App() {
           }`}>
             {ROLE_LABEL[user?.role] || user?.role}
           </span>
+          {user?.authMode === 'local' && (
+            // Sagt, wogegen geprueft wurde: gegen die Konten des Portals, nicht
+            // gegen das Unternehmensverzeichnis.
+            <p className="mt-2 text-[10px] leading-snug text-leise">
+              Lokales Konto (Prototyp)
+            </p>
+          )}
           {user?.authMode === 'simple' && (
             // Muss sichtbar bleiben: sonst sieht der einfache Weg im Betrieb
             // genauso aus wie eine geprüfte Anmeldung.
@@ -129,7 +148,13 @@ export default function App() {
           })}
         </nav>
 
-        <div className="p-3 border-t border-linie">
+        <div className="p-3 border-t border-linie space-y-1">
+          {user?.authMode === 'local' && (
+            <button onClick={() => setPasswortOffen(true)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-gedimmt hover:bg-flaeche hover:text-tinte rounded text-sm transition-colors">
+              <KeyRound size={16} /> Passwort ändern
+            </button>
+          )}
           <button onClick={() => (authMode() === 'off' ? setAuthenticated(false) : signOut())}
             className="w-full flex items-center gap-2 px-3 py-2 text-gedimmt hover:bg-flaeche hover:text-tinte rounded text-sm transition-colors">
             <LogOut size={16} /> Abmelden
@@ -142,6 +167,13 @@ export default function App() {
           <h1 className="font-semibold text-tinte">{area.name}</h1>
           {area.subtitle && <p className="text-xs text-leise">{area.subtitle}</p>}
         </div>
+
+        {user?.mustChangePassword && !passwortOffen && (
+          <div className="px-6 py-2.5 bg-[#fdf3e2] border-b border-[#e9c98f] text-[#8a5200] text-sm flex items-center gap-3">
+            <span>Dieses Konto hat noch das ausgelieferte Passwort.</span>
+            <button onClick={() => setPasswortOffen(true)} className="underline font-medium">jetzt ändern</button>
+          </div>
+        )}
 
         {allowed ? <Body /> : (
           <div className="flex-1 flex items-center justify-center">
@@ -157,6 +189,17 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {passwortOffen && (
+        <PasswordDialog
+          pflicht={Boolean(user?.mustChangePassword)}
+          onClose={() => setPasswortOffen(false)}
+          onDone={() => {
+            setPasswortOffen(false);
+            setUser((u) => ({ ...u, mustChangePassword: false }));
+          }}
+        />
+      )}
     </div>
   );
 }

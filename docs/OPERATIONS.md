@@ -164,5 +164,7 @@ SSE-Strom erst am Stück beim Browser an.
 | Audit-Log | `/data/audit.jsonl` im Volume `audit_data` | ja |
 | Einstellungen | `/data/settings.json`, 0600 | ja |
 | Geräte-Token | `/data/agents.json`, 0600 | ja |
+| Konten (`portal_users`) | Postgres, Volume `db_data` | ja |
+| Kiosk-Anforderungen (`kiosk_requests`) | Postgres, Volume `db_data` | ja |
 | Aufträge, Geräte | RAM | nein |
 | Ticket je Gespräch | RAM | nein |

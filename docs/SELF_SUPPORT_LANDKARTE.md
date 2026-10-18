@@ -83,6 +83,13 @@ Felder) — jemand fragt nach Software, das Portal gibt sie frei, der Mitarbeite
 holt sie im Kiosk. Das trennt Freigabe und Ausführung sauber, ohne dass das
 Portal je etwas auf einem fremden Rechner ausführt.
 
+**Genau das ist am 2026-10-18 gebaut worden** — als eigener Bereich und nicht
+im Chat: Der Mitarbeiter sieht einen Katalog aus freigebbaren Jobs, fordert
+einen an, die IT gibt frei, das Portal ruft dabei `POST /v2.0/KioskReleases`.
+Installiert wird im Kiosk. Einen Softwarekatalog baut das Portal damit weiter
+nicht nach; es verweist auf den vorhandenen. Stand und Grenzen in
+[`BARAMUNDI.md`](BARAMUNDI.md).
+
 ### Hardware und Genehmigungen
 
 **Nicht unser Feld.** Bestellstrecken mit Vorgesetztengenehmigung sind ein

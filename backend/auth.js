@@ -46,17 +46,46 @@ const DEV_USER = {
 // --- Anmeldeweg ---------------------------------------------------------------
 //
 // 'entra'  Microsoft 365, Token wird geprueft. Der einzige Weg fuer den Echtbetrieb.
+// 'local'  Konto und Passwort aus der portaleigenen Datenbank. Das Passwort
+//          wird wirklich geprueft (scrypt), die Rolle kommt bei jeder Anfrage
+//          frisch aus der Tabelle. Geprueft wird damit gegen das Portal, nicht
+//          gegen das Verzeichnis des Unternehmens — fuer den Echtbetrieb bleibt
+//          Entra der richtige Weg.
 // 'simple' Der Nutzer tippt nur seinen Namen. Das ist KEINE Authentifizierung,
 //          sondern eine Behauptung — niemand prueft sie. Nur fuer den Prototyp,
 //          und im Portal wie im Audit-Log ausdruecklich als ungeprueft markiert.
 // 'off'    Fester Entwicklungs-Benutzer wie bisher.
-const MODE = CONFIG.enabled ? 'entra' : process.env.SIMPLE_LOGIN === 'true' ? 'simple' : 'off';
+//
+// Die Reihenfolge ist eine Rangfolge: Entra schlaegt alles, danach der echte
+// Passwortweg, danach der behauptete Name. Zwei Wege gleichzeitig gibt es
+// nicht — sonst waere der schwaechere eine offene Hintertuer.
+const MODE = CONFIG.enabled
+  ? 'entra'
+  : process.env.LOCAL_LOGIN === 'true'
+    ? 'local'
+    : process.env.SIMPLE_LOGIN === 'true' ? 'simple' : 'off';
 
 // Ohne gesetztes Geheimnis wird eines je Start erzeugt: dann gelten ausgestellte
 // Sitzungen nur bis zum naechsten Neustart. Das ist fuer einen Prototyp richtig
 // herum — lieber abgemeldet als ein Geheimnis, das jeder kennt.
 const SIMPLE_SECRET = process.env.SIMPLE_LOGIN_SECRET || crypto.randomBytes(32).toString('hex');
 const SIMPLE_TTL_MS = 12 * 60 * 60 * 1000;
+
+// --- Lokale Konten ------------------------------------------------------------
+//
+// Eigenes Geheimnis, ersatzweise das des einfachen Wegs. Ohne gesetzten Wert
+// wird eines je Start erzeugt: dann gelten Sitzungen nur bis zum naechsten
+// Neustart. Fuer einen Prototyp richtig herum — lieber abgemeldet als ein
+// Geheimnis, das im Repository steht.
+const LOCAL_SECRET = process.env.LOCAL_LOGIN_SECRET || process.env.SIMPLE_LOGIN_SECRET
+  || crypto.randomBytes(32).toString('hex');
+const LOCAL_TTL_MS = Number(process.env.LOCAL_SESSION_HOURS || 12) * 60 * 60 * 1000;
+
+const accounts = require('./accounts');
+const users = require('./users');
+
+const signLocalToken = (user) => accounts.signSession(user, LOCAL_SECRET, LOCAL_TTL_MS);
+const verifyLocalToken = (token) => accounts.verifySession(token, LOCAL_SECRET);
 
 const simpleAuth = require('./simple-auth');
 const IDENTITY = simpleAuth.IDENTITY;
@@ -112,6 +141,51 @@ async function verifyToken(token) {
 async function requireUser(req, res, next) {
   if (MODE === 'off') {
     req.user = { ...DEV_USER, authMode: 'off' };
+    return next();
+  }
+
+  if (MODE === 'local') {
+    const header = req.get('authorization') || '';
+    if (!header.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Nicht angemeldet.' });
+    }
+    const claims = verifyLocalToken(header.slice(7));
+    if (!claims) {
+      return res.status(401).json({ error: 'Sitzung abgelaufen oder ungueltig.' });
+    }
+
+    // Rolle und Zustand kommen bei JEDER Anfrage aus der Datenbank, nicht aus
+    // dem Token. Sonst behielte ein Konto seine Rolle bis zum Ablauf der
+    // Sitzung — auch nachdem ein Administrator sie entzogen hat.
+    let konto;
+    try {
+      konto = await users.findForSession(claims.id);
+    } catch (err) {
+      // Datenbank weg heisst nicht angemeldet. Ein stiller Durchlauf waere
+      // hier die Luecke: dann waere die Datenbank die Rechtevergabe, und ihr
+      // Ausfall waere eine Rechteerweiterung.
+      return res.status(503).json({ error: `Kontodatenbank nicht erreichbar: ${err.message}` });
+    }
+    if (!konto || !konto.active) {
+      return res.status(401).json({ error: 'Konto gesperrt oder gelöscht.' });
+    }
+    if (konto.tokenVersion !== claims.v) {
+      return res.status(401).json({ error: 'Sitzung wurde beendet — bitte neu anmelden.' });
+    }
+
+    req.user = {
+      id: konto.username,
+      displayName: konto.displayName || konto.username,
+      email: konto.username.includes('@') ? konto.username : '',
+      department: '',
+      role: konto.role,
+      // Ein Passwort wurde wirklich geprueft — gegen die Tabelle des Portals,
+      // nicht gegen das Unternehmensverzeichnis.
+      authenticated: true,
+      authMode: 'local',
+      mustChangePassword: konto.mustChange,
+      accountId: konto.id
+    };
     return next();
   }
 
@@ -195,5 +269,6 @@ function publicConfig() {
 
 module.exports = {
   requireUser, requireRole, publicConfig, CONFIG, DEV_USER, ROLES, rank,
-  MODE, IDENTITY, signSimpleToken, verifySimpleToken, roleFromName
+  MODE, IDENTITY, signSimpleToken, verifySimpleToken, roleFromName,
+  signLocalToken, verifyLocalToken, LOCAL_TTL_MS
 };

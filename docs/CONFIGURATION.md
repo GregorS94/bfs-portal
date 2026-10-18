@@ -37,17 +37,32 @@ Volume wie das Audit-Log. Treiber lesen bei jedem Zugriff frisch — eine
 | `DEV_ROLE` | `admin` | Rolle des Entwicklungs-Benutzers, wenn Entra aus ist |
 | `DEV_USER_ID` | `dev@bfs.local` | Kennung des Entwicklungs-Benutzers. Zum Durchspielen des Vier-Augen-Prinzips ohne Entra: zwei Instanzen mit verschiedenen Kennungen starten |
 | `DEV_USER_NAME` | `Entwicklungs-Benutzer` | Anzeigename des Entwicklungs-Benutzers |
-| `SIMPLE_LOGIN` | `false` | `true` schaltet den einfachen Anmeldeweg frei (nur wirksam, wenn `ENTRA_ENABLED` aus ist) |
+| `SIMPLE_LOGIN` | `false` | `true` schaltet den einfachen Anmeldeweg frei (nur wirksam, wenn `ENTRA_ENABLED` und `LOCAL_LOGIN` aus sind) |
 | `SIMPLE_LOGIN_SECRET` | je Start erzeugt | Schlüssel für die Sitzungen des einfachen Wegs. Ohne festen Wert sind alle nach einem Neustart abgemeldet |
+| `LOCAL_LOGIN` | `false` | `true` schaltet Konto und Passwort aus der Datenbank frei (nur wirksam, wenn `ENTRA_ENABLED` aus ist) |
+| `LOCAL_LOGIN_SECRET` | je Start erzeugt, ersatzweise `SIMPLE_LOGIN_SECRET` | Schlüssel für die Sitzungen des lokalen Wegs |
+| `LOCAL_SESSION_HOURS` | `12` | Laufzeit einer lokalen Sitzung |
+| `LOCAL_ADMIN_USER` / `LOCAL_ADMIN_PASSWORD` | `admin` / `admin` | Startkonto mit Rolle `admin` |
+| `LOCAL_USER_USER` / `LOCAL_USER_PASSWORD` | `user` / `1234` | Startkonto mit Rolle `user` |
 
-**Drei Anmeldewege, genau einer ist zu jeder Zeit aktiv.** Das Backend meldet
+**Vier Anmeldewege, genau einer ist zu jeder Zeit aktiv.** Das Backend meldet
 den aktiven Weg unter `GET /api/config` als `mode`:
 
 | `mode` | wann | was geprüft wird |
 |--------|------|------------------|
 | `entra` | `ENTRA_ENABLED=true` | Microsoft-Token gegen die JWKS des Mandanten. Der einzige Weg für den Echtbetrieb |
+| `local` | sonst, mit `LOCAL_LOGIN=true` | **ein Passwort**, scrypt-gehasht, gegen die Tabelle `portal_users`. Geprüft wird gegen das Portal, nicht gegen das Unternehmensverzeichnis |
 | `simple` | sonst, mit `SIMPLE_LOGIN=true` | **nichts.** Der Nutzer tippt einen Namen, das Portal glaubt ihn |
 | `off` | sonst | fester Entwicklungs-Benutzer aus `DEV_USER_ID` |
+
+**Im Modus `local` kommen die Rollen aus der Datenbank**, nicht aus den
+Namenslisten — und zwar bei jeder Anfrage neu. Entzieht ein Administrator eine
+Rolle, wirkt das sofort und nicht erst beim nächsten Anmelden.
+
+**Die Startkonten werden nur angelegt, wenn die Tabelle leer ist.** Ein
+gelöschtes `admin` kommt durch einen Neustart nicht zurück. Beide Startkonten
+sind als „muss geändert werden" markiert; solange das so ist, nennt die
+Administrationsseite sie beim Namen und die Anmeldemaske warnt.
 
 Rollen in der Reihenfolge ihrer Rechte: `user` → `it` → `admin`.
 Bevorzugte Quelle sind die Entra-App-Rollen `portal.it` und `portal.admin`.
@@ -94,6 +109,8 @@ Nur `.env`, nicht in der Oberfläche.
 | `BCONNECT_PASSWORD` | — | HTTP Basic |
 | `BCONNECT_ALLOW_SELF_SIGNED` | `false` | für Testinstallationen |
 | `BCONNECT_POLL_MS` | `5000` | Abstand zwischen zwei Statusabfragen |
+| `BCONNECT_KIOSK_JOBS` | leer | Jobnamen, die das Portal **im Kiosk freigeben** darf. Leer heisst: der Kiosk-Bereich ist aus. Bewusst getrennt von `BCONNECT_ALLOWED_JOBS` — das eine erlaubt dem Chat, etwas auszuführen, das andere einem Mitarbeiter, sich etwas zu installieren |
+| `BCONNECT_KIOSK_URL` | aus `BCONNECT_SERVER` gebildet | Adresse der Kiosk-Weboberfläche, Vorgabe `https://{server}/bWebServer/Kiosk` |
 | `BCONNECT_ALLOWED_JOBS` | leer | **ohne diese Liste ist nichts ausführbar** |
 
 Der bMS-Katalog enthält auch Rollouts und Compliance-Läufe. Nur was hier
@@ -139,3 +156,32 @@ Nach der ersten Anmeldung braucht der Agent `AGENT_TOKEN` nicht mehr — er
 arbeitet mit dem Token aus `AGENT_TOKEN_FILE`. Löscht man diese Datei, meldet
 er sich beim nächsten Start neu an und bekommt ein frisches Token; das alte
 verfällt dabei.
+
+## Datenbank (Postgres)
+
+Trägt die Konten (`portal_users`) und die Kiosk-Anforderungen
+(`kiosk_requests`). Alles andere liegt weiter in Dateien oder im RAM — siehe
+[OPERATIONS.md](OPERATIONS.md#datenhaltung).
+
+| Variable | Vorgabe | Bedeutung |
+|----------|---------|-----------|
+| `DB_PASSWORD` | — | **Pflicht**, auch für `docker compose`: der Postgres-Container bekommt sie als `POSTGRES_PASSWORD`. Ohne sie bricht `docker compose up` ab |
+| `DB_HOST` | `db` | der Container im selben Netz |
+| `DB_PORT` | `5432` | |
+| `DB_NAME` | `bfs_portal` | |
+| `DB_USER` | `portal` | |
+| `DATABASE_URL` | — | vollständiger Verbindungsstring; hat Vorrang vor den fünf Werten oben |
+
+Das Schema legt das Backend beim Start selbst an (`CREATE TABLE IF NOT
+EXISTS`). Zwei Tabellen rechtfertigen keine Migrationsbibliothek.
+
+**Warum Postgres und nicht Supabase:** Supabase ist Postgres plus Auth,
+Storage, Realtime und Studio — Dienste, die das Portal nicht benutzt und die
+auf einem Raspberry Pi 5 viel Speicher für nichts belegen. Das Datenmodell ist
+reines SQL; ein Umzug auf Supabase oder einen Unternehmensserver ist ein
+Verbindungsstring, kein Umbau.
+
+**Ohne Datenbank bleibt der lokale Weg aus, aber sichtbar.** `LOCAL_LOGIN=true`
+ohne erreichbare Datenbank liefert `503` beim Anmelden und an jeder
+Portal-Route. Ein stiller Durchlauf wäre hier die Lücke: dann wäre die
+Datenbank die Rechtevergabe, und ihr Ausfall eine Rechteerweiterung.

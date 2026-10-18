@@ -35,6 +35,25 @@ Geheimnisse enthalten können. Dafür gibt es `chat: false`.
 **Treibertests setzen ein eigenes `DATA_DIR`.** Sonst laufen sie gegen die
 echten gespeicherten Zugangsdaten statt gegen die Testumgebung.
 
+**Was die Datenbank anfasst, wird gegen einen echten Postgres geprueft**, nicht
+gegen einen Nachbau. `tools/db-test.js` legt dafuer eine eigene Datenbank
+`<name>_test` an und wirft sie weg; ohne erreichbaren Postgres meldet er
+„UEBERSPRUNGEN" und bricht nicht ab. Auf dem Host:
+
+```bash
+docker compose cp tools bfs-portal-backend:/tmp/tools
+docker compose exec backend node /tmp/tools/db-test.js
+```
+
+**Wer darf wen aendern, steht in `accounts.js`, nicht in der Route.** Die drei
+Faelle, in denen sich das Portal selbst aussperrt (eigenes Konto, eigene
+Adminrolle, letzter Administrator), sind dort reine Rechnung und ohne Datenbank
+pruefbar. In der Route steht nur der Aufruf.
+
+**Der Passworthash verlaesst `users.js` nur ueber `findForLogin()`.** Alle
+anderen Funktionen geben eine Sicht ohne Hash zurueck, damit er nicht
+versehentlich in einer JSON-Antwort landet.
+
 ## Sprache
 
 Code-Kommentare, Dokumentation und Oberfläche sind auf Deutsch. Bezeichner im
@@ -51,7 +70,8 @@ git add -A && git commit && git push
 ```
 
 ```bash
-for t in actions atlassian settings approval audit agents simple-auth agent-allowlist bconnect; do
+for t in accounts actions atlassian settings approval audit agents simple-auth \
+         agent-allowlist bconnect kiosk; do
   node tools/$t-test.js || break
 done
 ```

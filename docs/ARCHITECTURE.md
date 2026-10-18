@@ -7,11 +7,22 @@
 | `frontend` | React (kein Router), nginx | 9000 → 80 | Oberfläche, Statik, `/api`-Proxy |
 | `backend` | Node/Express | 9001 → 3000 | Chat, Werkzeuge, Aufträge, Audit, Treiber |
 | `mock-api` | Node | 9002 → 3002 | Attrappe für Fremdsysteme im Entwicklungsbetrieb |
+| `db` | Postgres 16 | kein Port nach außen | Konten und Kiosk-Anforderungen |
 | Agent | Python 3, nur Standardbibliothek | — | läuft auf dem Zielgerät, holt Aufträge ab |
 
 Zustandsdaten liegen im Volume `audit_data` unter `/data`:
 `audit.jsonl` (Audit-Log) und `settings.json` (über die Oberfläche gesetzte
 Zugangsdaten, Rechte 0600).
+
+In der Datenbank liegen genau zwei Dinge: die Konten des lokalen Anmeldewegs
+und die Kiosk-Anforderungen. Beides muss einen Neustart überleben und in der
+Oberfläche änderbar sein — dafür ist eine Datei das falsche Werkzeug. Alles
+andere bleibt, wo es war; die Datenbank ist kein Grund, das Audit-Log
+umzuziehen (eine angehängte Datei mit Hash-Kette ist dort schwerer zu
+manipulieren als eine Tabelle).
+
+Die Datenbank hat **keinen Port nach außen**. Nur die Container im selben Netz
+sprechen mit ihr; wer hineinsehen will, nimmt `docker compose exec db psql`.
 
 ## Warum der Agent zieht statt geschoben zu bekommen
 

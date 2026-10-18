@@ -38,6 +38,8 @@ const JOBS = [
 ];
 
 const instances = new Map();
+// Kiosk-Freigaben der Attrappe. Schluessel ist die Kennung, die POST zurueckgibt.
+const kioskReleases = new Map();
 let counter = 0;
 
 const server = https.createServer(
@@ -113,6 +115,33 @@ function v2(req, res, url) {
     return json({ data: JOBS.map((j) => klein({ ...j, displayName: j.Name })) });
   }
 
+  // --- Kiosk ---------------------------------------------------------------
+  // Nach bConnect_Jobs.json (bMS 26R1): POST mit genau zwei Pflichtfeldern,
+  // DELETE je Kennung. Die Attrappe weist einen dritten Feldnamen NICHT ab —
+  // sie prueft nur, dass die beiden Pflichtfelder da sind, wie der Server.
+  if (ressource === 'KioskReleases') {
+    if (!id && req.method === 'POST') {
+      return leseKoerper(req, (koerper) => {
+        if (!koerper?.assignmentTargetId || !koerper?.jobDefinitionId) {
+          return json({ message: 'assignmentTargetId und jobDefinitionId sind Pflicht' }, 400);
+        }
+        const neu = `rel-${++counter}`;
+        kioskReleases.set(neu, {
+          id: neu,
+          assignmentTargetId: koerper.assignmentTargetId,
+          jobDefinitionId: koerper.jobDefinitionId
+        });
+        return json({ id: neu }, 201);
+      });
+    }
+    if (id && req.method === 'DELETE') {
+      if (!kioskReleases.has(id)) return json({ message: 'unknown release' }, 404);
+      kioskReleases.delete(id);
+      // Der Server antwortet auf DELETE ohne Inhalt.
+      return res.writeHead(204).end();
+    }
+  }
+
   if (ressource === 'JobInstances') {
     if (!id && req.method === 'POST') {
       return leseKoerper(req, (koerper) => {
@@ -173,7 +202,7 @@ function leseKoerper(req, weiter) {
 
 const PORT = Number(process.argv[2] || 8443);
 
-module.exports = { server, PORT, USER, PASS, APIKEY, ENDPOINTS, JOBS, SOFTWARE, instances, ENDZUSTAND };
+module.exports = { server, PORT, USER, PASS, APIKEY, ENDPOINTS, JOBS, SOFTWARE, instances, kioskReleases, ENDZUSTAND };
 
 // Nur starten, wenn direkt aufgerufen — bconnect-test.js bindet die Attrappe
 // ein und startet sie selbst.

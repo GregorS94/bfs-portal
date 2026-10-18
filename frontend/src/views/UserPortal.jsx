@@ -1,9 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, CheckCircle, AlertCircle, ShieldAlert, Terminal, MessageSquare, Package, Loader2 } from 'lucide-react';
+import { Send, ShieldAlert, Terminal, MessageSquare, Package, Loader2 } from 'lucide-react';
 import RichText from '../markdown';
 import { authedFetch } from '../auth';
+import KioskPanel from './KioskPanel';
 
-// Mitarbeiter-Sicht: Chat und Software. Keine Geräte, kein Audit.
+// Mitarbeiter-Sicht: Chat und Kiosk. Keine Geräte, kein Audit.
+//
+// Der Reiter „Software" war bis zum 2026-10-18 eine Attrappe — er rief
+// `/api/baramundi/software` auf, eine Route, die es nie gab. Jetzt steht dort
+// der echte Weg: anfordern, die IT gibt frei, abholen im baramundi Kiosk.
 export default function UserPortal() {
   const [activeTab, setActiveTab] = useState('chat');
   const [messages, setMessages] = useState([]);
@@ -12,8 +17,6 @@ export default function UserPortal() {
   const [pendingApprovals, setPendingApprovals] = useState([]);
   const [toolRuns, setToolRuns] = useState([]);
   const messagesEndRef = useRef(null);
-
-  const [softwareData, setSoftwareData] = useState({ available: [], loading: false });
 
   const addMessage = (role, content) =>
     setMessages(prev => [...prev, { id: prev.length + 1, role, content, timestamp: new Date() }]);
@@ -103,18 +106,11 @@ export default function UserPortal() {
     }
   };
 
-  const loadSoftware = async () => {
-    setSoftwareData({ ...softwareData, loading: true });
-    const res = await authedFetch('/api/baramundi/software');
-    const data = await res.json();
-    setSoftwareData({ available: data.available || [], loading: false });
-  };
-
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, pendingApprovals]);
 
   const TABS = [
     { id: 'chat', label: 'Chat', icon: MessageSquare },
-    { id: 'software', label: 'Software', icon: Package }
+    { id: 'kiosk', label: 'Software', icon: Package }
   ];
 
   return (
@@ -225,21 +221,8 @@ export default function UserPortal() {
           </div>
         )}
 
-        {activeTab === 'software' && (
-          <div>
-            <button onClick={loadSoftware} className="mb-4 px-4 py-2 bg-akzent hover:bg-akzent-hell text-white rounded transition-colors">
-              {softwareData.loading ? 'Wird geladen…' : 'Software laden'}
-            </button>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {softwareData.available.map(app => (
-                <div key={app.id} className="bg-white p-4 rounded border border-linie hover:border-[#d8d4cd] transition-colors">
-                  <h3 className="font-bold text-tinte">{app.name}</h3>
-                  <p className="text-sm text-leise">{app.description}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {activeTab === 'kiosk' && <KioskPanel />}
+
       </div>
     </>
   );

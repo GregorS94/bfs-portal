@@ -27,6 +27,12 @@ let config = { authEnabled: false, mode: 'off' };
 const SIMPLE_KEY = 'bfs.simple.token';
 const simpleToken = () => sessionStorage.getItem(SIMPLE_KEY) || '';
 
+// Sitzung der lokalen Konten. Auch hier sessionStorage: mit dem Schliessen des
+// Fensters ist man abgemeldet. localStorage waere bequemer und auf einem
+// geteilten Rechner falsch.
+const LOCAL_KEY = 'bfs.local.token';
+const localToken = () => sessionStorage.getItem(LOCAL_KEY) || '';
+
 export function mode() {
   return config.mode || (config.authEnabled ? 'entra' : 'off');
 }
@@ -62,8 +68,38 @@ export async function initAuth() {
 }
 
 export function account() {
+  if (mode() === 'local') return localToken() ? { username: 'local' } : null;
   if (mode() === 'simple') return simpleToken() ? { username: 'simple' } : null;
   return msal?.getActiveAccount() || null;
+}
+
+// Lokale Anmeldung: Konto und Passwort gegen die Datenbank des Portals. Der
+// Fehlertext kommt unveraendert vom Backend — er unterscheidet absichtlich
+// nicht zwischen unbekanntem Konto und falschem Passwort.
+export async function localSignIn(username, password) {
+  const res = await fetch(apiUrl('/api/auth/local'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  sessionStorage.setItem(LOCAL_KEY, data.token);
+  return data.user;
+}
+
+// Eigenes Passwort aendern. Das Backend stellt dabei ein neues Token aus, weil
+// es alle anderen Sitzungen beendet — ohne das waere man selbst mit abgemeldet.
+export async function changeOwnPassword(current, next) {
+  const res = await authedFetch('/api/auth/password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ current, next })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  if (data.token) sessionStorage.setItem(LOCAL_KEY, data.token);
+  return true;
 }
 
 // Einfacher Anmeldeweg: nur ein Name, kein Passwort. Das Backend stellt darauf
@@ -85,6 +121,11 @@ export function signIn() {
 }
 
 export function signOut() {
+  if (mode() === 'local') {
+    sessionStorage.removeItem(LOCAL_KEY);
+    window.location.reload();
+    return undefined;
+  }
   if (mode() === 'simple') {
     sessionStorage.removeItem(SIMPLE_KEY);
     window.location.reload();
@@ -111,6 +152,10 @@ async function accessToken() {
 // Ersatz für fetch: hängt bei aktiver Anmeldung das Token an.
 export async function authedFetch(pfad, options = {}) {
   const url = apiUrl(pfad);
+  if (mode() === 'local') {
+    const headers = { ...(options.headers || {}), Authorization: `Bearer ${localToken()}` };
+    return fetch(url, { ...options, headers });
+  }
   if (mode() === 'simple') {
     const headers = { ...(options.headers || {}), Authorization: `Bearer ${simpleToken()}` };
     return fetch(url, { ...options, headers });

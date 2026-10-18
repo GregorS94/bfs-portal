@@ -23,15 +23,44 @@ services:
       - .env
     environment:
       DATA_DIR: /data
+      # Innerhalb des Netzes heisst die Datenbank "db". Der Wert aus der .env
+      # gewinnt, falls dort ein anderer Server steht.
+      DB_HOST: ${DB_HOST:-db}
+      DB_NAME: ${DB_NAME:-bfs_portal}
+      DB_USER: ${DB_USER:-portal}
     volumes:
       - audit_data:/data
     ports:
       - "9001:3000"
+    depends_on:
+      db:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
       interval: 30s
       timeout: 5s
       retries: 3
+
+  # Postgres. Kein Port nach aussen: nur die anderen Container im selben Netz
+  # sprechen mit der Datenbank. Wer von Hand hineinsehen will, nimmt
+  # `docker compose exec db psql`.
+  db:
+    image: postgres:16-alpine
+    container_name: bfs-portal-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-bfs_portal}
+      POSTGRES_USER: ${DB_USER:-portal}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD fehlt in der .env}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      # Ohne diesen Test startet das Backend vor der Datenbank und meldet beim
+      # ersten Anmelden 503.
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-portal} -d ${DB_NAME:-bfs_portal}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   mock-api:
     build: ./mock-apis
@@ -48,3 +77,4 @@ services:
 
 volumes:
   audit_data:
+  db_data:

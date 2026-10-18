@@ -1,6 +1,6 @@
 # Stand
 
-Letzte Aktualisierung: 2026-09-17. Fahrplan: [`FAHRPLAN.md`](FAHRPLAN.md).
+Letzte Aktualisierung: 2026-10-18. Fahrplan: [`FAHRPLAN.md`](FAHRPLAN.md).
 
 Prototyp und Entwicklungsumgebung, nichts Produktives. Hochverfügbarkeit,
 Alarmierung und Backups sind bewusst kein Ziel. Fernziel ist ein
@@ -28,6 +28,34 @@ die eigene Kennung, nach einem geänderten Zeichen im Token 401, Rolle `user`
 bekommt auf der IT-Route 403 und eine Kennung aus `ENTRA_IT_USERS` die Rolle
 `it`. Das Audit-Log führt `auth.simple.login` mit `verified: false`, die
 Seitenleiste zeigt dauerhaft „Testbetrieb — Identität ungeprüft".
+
+**Lokale Konten mit Passwort (`local`).** Dritter Anmeldeweg, seit 2026-10-18:
+Konto und Passwort aus einer Postgres-Tabelle, scrypt-gehasht, Rolle bei jeder
+Anfrage frisch aus der Datenbank. Dazu die Kontenverwaltung in der
+Administration — anlegen, Rolle ändern, sperren, Passwort setzen, löschen — und
+ein Dialog fürs eigene Passwort. Ausgeliefert wird `admin/admin` und
+`user/1234`; beide sind als „muss geändert werden" markiert. 52 Prüfungen ohne
+Datenbank (`tools/accounts-test.js`) und 33 gegen einen echten Postgres
+(`tools/db-test.js`). Was dabei auffiel und behoben ist: ein gekürzter
+Passworthash hätte weiter gepasst, weil die Ausgabe von PBKDF2 präfixstabil
+ist — siehe [`SECURITY.md`](SECURITY.md#der-modus-local-authentifiziert--gegen-das-portal).
+
+**Datenbank.** Postgres 16 als Container ohne Port nach außen, Volume
+`db_data`. Trägt die Konten und die Kiosk-Anforderungen; alles andere liegt
+weiter in Dateien oder im RAM. Fällt sie aus, antwortet der lokale Anmeldeweg
+mit 503 statt jemanden durchzulassen.
+
+**Kiosk-Bereich.** Der Reiter „Software" war eine Attrappe (er rief eine Route
+auf, die es nie gab) und ist jetzt der echte Weg: anfordern → die IT gibt frei
+→ im baramundi Kiosk abholen. Freigegeben wird mit `POST /v2.0/KioskReleases`,
+zurückgezogen mit `DELETE`; beide Formen stehen wörtlich in der
+Schnittstellenbeschreibung. Das Portal führt dabei **nichts** aus. 15 Prüfungen
+gegen die Attrappe, der Ablauf gegen Postgres. Einzelheiten und Grenzen in
+[`BARAMUNDI.md`](BARAMUNDI.md).
+
+**Audit-Log in der Oberfläche.** Eine Fassung für IT und Administration statt
+zwei Abschriften, mit Filter, wählbarer Länge und — nur für Administratoren —
+dem Zustand der Hash-Kette.
 
 **Absicherung.** Zwei unabhängige Ebenen, im Test abgewiesen wurden `bash -c`,
 `curl`, `systemctl mask` und ein Argument mit `;`. Details in
@@ -88,13 +116,22 @@ Seitenkörper nachgeladen und aus dem XHTML Fließtext gemacht.
    [`docs/BARAMUNDI.md`](BARAMUNDI.md). Offen bleibt allein der erste Lauf
    gegen den echten Server — und der ist zurückgestellt, siehe
    [`FAHRPLAN.md`](FAHRPLAN.md).
-4. **Software-Tab ist eine Attrappe.**
+4. ~~Software-Tab ist eine Attrappe.~~ **Entfallen am 2026-10-18** — ersetzt
+   durch den Kiosk-Bereich. Offen bleibt der erste Lauf gegen einen echten
+   bMS-Server und die Frage, ob die Kiosk-Schnittstelle dort überhaupt
+   eingeschaltet ist.
 5. **Freigabe eines fremden Auftrags als `user`** ist am laufenden System
    ungeprüft — dafür braucht es zwei echte Identitäten. Die Regel selbst ist
    in `tools/approval-test.js` abgedeckt.
 6. **Aufträge und Geräte liegen im RAM** und sind nach einem Backend-Neustart
-   weg. Das Audit-Log überlebt.
+   weg. Audit-Log, Konten und Kiosk-Anforderungen überleben.
 7. **Die Windows-Varianten der Aktionen sind nie auf Windows gelaufen.**
+8. **Die Leseendpunkte des Kiosk sind nicht umgesetzt**, weil ihre Pfade nicht
+   wörtlich vorliegen. Das Zuweisungsziel trägt deshalb die IT bei der Freigabe
+   ein, statt dass das Portal es aus dem Anmeldenamen ableitet.
+9. **Der lokale Anmeldeweg prüft gegen das Portal, nicht gegen das AD.** Für
+   den Echtbetrieb bleibt Entra der einzige zulässige Weg; `local` ist der
+   bequeme Weg für Vorführung und Entwicklung ohne Mandanten.
 
 ## Vor einem Produktivbetrieb
 
