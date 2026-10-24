@@ -55,7 +55,7 @@ export default function AuditPanel({ mitKette = false }) {
     <div>
       <div className="flex items-center gap-2 mb-3 flex-wrap">
         <button onClick={load}
-          className="px-4 py-2 bg-akzent hover:bg-akzent-hell text-white rounded text-sm transition-colors flex items-center gap-2">
+          className="px-4 py-2 bg-akzent hover:bg-akzent-hell text-white rounded-md text-sm transition-colors flex items-center gap-2">
           <RefreshCw size={14} className={audit.loading ? 'animate-spin' : ''} /> Aktualisieren
         </button>
         <div className="relative">
@@ -75,8 +75,8 @@ export default function AuditPanel({ mitKette = false }) {
 
       {kette && (
         <div className={`mb-3 px-4 py-3 rounded border text-sm flex items-start gap-2 ${kette.ok
-          ? 'bg-[#e9f5ec] border-[#b7dcc1] text-[#1f6b39]'
-          : 'bg-[#fbeaea] border-[#e8bcbc] text-[#a32020]'}`}>
+          ? 'bg-erfolg-zart border-erfolg-rand text-erfolg'
+          : 'bg-fehler-zart border-fehler-rand text-fehler'}`}>
           {kette.ok ? <ShieldCheck size={16} className="mt-0.5 shrink-0" /> : <ShieldAlert size={16} className="mt-0.5 shrink-0" />}
           <span>
             {kette.ok
@@ -86,8 +86,8 @@ export default function AuditPanel({ mitKette = false }) {
         </div>
       )}
 
-      <div className="bg-white border border-linie rounded overflow-hidden">
-        {audit.error && <p className="p-4 text-sm text-[#a32020]">{audit.error}</p>}
+      <div className="bg-white border border-linie rounded-xl shadow-sm overflow-hidden">
+        {audit.error && <p className="p-4 text-sm text-fehler">{audit.error}</p>}
         {!audit.error && !sichtbar.length && !audit.loading && (
           <p className="p-4 text-sm text-leise">
             {audit.entries.length ? 'Kein Eintrag passt zum Filter.' : 'Noch keine Einträge.'}
@@ -98,7 +98,7 @@ export default function AuditPanel({ mitKette = false }) {
             <span className="text-leise font-mono text-xs whitespace-nowrap">
               {new Date(e.ts).toLocaleString('de-DE')}
             </span>
-            <span className="font-mono text-xs font-bold text-gedimmt whitespace-nowrap w-48 truncate" title={e.event}>
+            <span className="font-mono text-xs font-semibold text-gedimmt whitespace-nowrap w-48 truncate" title={e.event}>
               {e.event}
             </span>
             <span className="text-leise text-xs truncate" title={rest(e)}>{rest(e)}</span>

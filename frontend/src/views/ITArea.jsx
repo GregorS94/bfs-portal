@@ -3,6 +3,7 @@ import { RefreshCw, ShieldAlert, ClipboardList, Wrench, ScrollText, Package } fr
 import { authedFetch } from '../auth';
 import AuditPanel from './AuditPanel';
 import KioskApprovals from './KioskApprovals';
+import Statuspille from '../Statuspille';
 
 // IT-Bereich: Geräte, offene Freigaben, Auftragsverlauf, Audit-Log.
 // Bewusst ohne Chat — der ITler arbeitet hier an Aufträgen, nicht am Dialog.
@@ -42,11 +43,16 @@ export default function ITArea() {
   ];
 
   const pending = jobs.list.filter(j => j.status === 'awaiting_approval');
-  const STATUS_STYLE = {
-    awaiting_approval: 'bg-amber-500/15 text-[#8a5200]',
-    done: 'bg-emerald-500/15 text-[#1f6b39]',
-    error: 'bg-rose-500/15 text-[#a32020]',
-    denied: 'bg-slate-200 text-gedimmt'
+  // Auftragszustände auf die fünf Töne der Statuspille abgebildet. 'queued' und
+  // 'running' sind beide „in Bearbeitung" — für den Lesenden ist der
+  // Unterschied zwischen „wartet in der Schlange" und „läuft gerade" bedeutungslos.
+  const STATUS_TON = {
+    awaiting_approval: 'warten',
+    queued: 'laeuft',
+    running: 'laeuft',
+    done: 'fertig',
+    error: 'fehler',
+    denied: 'ruhend'
   };
 
   return (
@@ -64,7 +70,7 @@ export default function ITArea() {
             <Symbol size={15} strokeWidth={1.75} />
             {t.label}
             {t.id === 'jobs' && pending.length > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 bg-akzent text-white rounded text-[10px] font-bold">{pending.length}</span>
+              <span className="ml-1 px-1.5 py-0.5 bg-akzent text-white rounded text-[10px] font-semibold">{pending.length}</span>
             )}
           </button>
           );
@@ -74,44 +80,44 @@ export default function ITArea() {
       <div className="flex-1 overflow-y-auto p-6">
         {activeTab === 'jobs' && (
           <div>
-            <button onClick={loadJobs} className="mb-4 px-4 py-2 bg-akzent hover:bg-akzent-hell text-white rounded transition-colors flex items-center gap-2">
+            <button onClick={loadJobs} className="mb-4 px-4 py-2 bg-akzent hover:bg-akzent-hell text-white rounded-md transition-colors flex items-center gap-2">
               <RefreshCw size={16} className={jobs.loading ? 'animate-spin' : ''} /> Aktualisieren
             </button>
-            {jobs.error && <p className="text-[#a32020] text-sm mb-4">{jobs.error}</p>}
+            {jobs.error && <p className="text-fehler text-sm mb-4">{jobs.error}</p>}
 
             {pending.length > 0 && (
               <div className="mb-6">
-                <h3 className="font-bold text-tinte mb-2 flex items-center gap-2">
-                  <ShieldAlert size={18} className="text-amber-400" /> Wartet auf Freigabe
+                <h3 className="font-semibold text-tinte mb-2 flex items-center gap-2">
+                  <ShieldAlert size={18} className="text-warnung" /> Wartet auf Freigabe
                 </h3>
                 {pending.map(j => (
-                  <div key={j.id} className="bg-[#fdf3e2] border border-[#e9c98f] rounded p-4 mb-2 rise-in">
-                    <p className="text-sm text-[#8a5200]">
-                      <span className="font-mono font-bold">{j.action}</span>
-                      {' '}auf <span className="font-bold">{j.deviceId}</span>
+                  <div key={j.id} className="bg-warnung-zart border border-warnung-rand rounded-xl p-4 mb-2 rise-in">
+                    <p className="text-sm text-warnung">
+                      <span className="font-mono font-semibold">{j.action}</span>
+                      {' '}auf <span className="font-semibold">{j.deviceId}</span>
                       {' '}· angefordert von {j.requestedBy}
                     </p>
                     {Object.keys(j.params || {}).length > 0 && (
-                      <pre className="text-xs bg-white border border-[#e9c98f] rounded p-2 my-2">{JSON.stringify(j.params)}</pre>
+                      <pre className="text-xs bg-white border border-warnung-rand rounded p-2 my-2">{JSON.stringify(j.params)}</pre>
                     )}
                     <div className="flex gap-2 mt-2">
-                      <button onClick={() => decide(j.id, true)} className="px-3.5 py-1.5 bg-akzent hover:bg-akzent-hell text-white rounded text-sm font-medium transition-colors">Freigeben</button>
-                      <button onClick={() => decide(j.id, false)} className="px-3.5 py-1.5 text-gedimmt border border-[#d8d4cd] hover:bg-flaeche rounded text-sm transition-colors">Ablehnen</button>
+                      <button onClick={() => decide(j.id, true)} className="px-3.5 py-1.5 bg-akzent hover:bg-akzent-hell text-white rounded-md text-sm font-medium transition-colors">Freigeben</button>
+                      <button onClick={() => decide(j.id, false)} className="px-3.5 py-1.5 text-gedimmt border border-linie hover:bg-flaeche rounded-md text-sm transition-colors">Ablehnen</button>
                     </div>
                   </div>
                 ))}
               </div>
             )}
 
-            <h3 className="font-bold text-tinte mb-2">Verlauf</h3>
-            <div className="bg-white border border-linie rounded overflow-hidden">
-              {jobs.list.length === 0 && !jobs.error && <p className="p-4 text-sm text-leise">Noch keine Aufträge.</p>}
+            <h3 className="text-sm font-semibold text-tinte mb-2">Verlauf</h3>
+            <div className="bg-white border border-linie rounded-xl shadow-sm overflow-hidden">
+              {jobs.list.length === 0 && !jobs.error && <p className="p-4 text-sm text-gedimmt">Noch keine Aufträge.</p>}
               {jobs.list.map(j => (
-                <div key={j.id} className="px-4 py-2 border-b border-linie last:border-0 flex items-center gap-3 text-sm">
-                  <span className={`px-2 py-0.5 rounded text-xs font-bold ${STATUS_STYLE[j.status] || 'bg-flaeche text-gedimmt'}`}>{j.status}</span>
+                <div key={j.id} className="px-4 h-12 border-b border-linie last:border-0 flex items-center gap-3 text-sm">
+                  <Statuspille ton={STATUS_TON[j.status]}>{j.status}</Statuspille>
                   <span className="font-mono text-tinte">{j.action}</span>
-                  <span className="text-leise">{j.deviceId}</span>
-                  <span className="text-leise text-xs ml-auto">
+                  <span className="text-gedimmt">{j.deviceId}</span>
+                  <span className="text-gedimmt text-xs ml-auto zahlen">
                     {new Date(j.createdAt).toLocaleTimeString('de-DE')}
                     {j.approvedBy ? ` · freigegeben von ${j.approvedBy}` : ''}
                   </span>
@@ -123,20 +129,20 @@ export default function ITArea() {
 
         {activeTab === 'devices' && (
           <div>
-            <button onClick={loadDevices} className="mb-4 px-4 py-2 bg-akzent hover:bg-akzent-hell text-white rounded transition-colors">
+            <button onClick={loadDevices} className="mb-4 px-4 py-2 bg-akzent hover:bg-akzent-hell text-white rounded-md transition-colors">
               <><RefreshCw size={14} className={devices.loading ? 'animate-spin' : ''} /> Aktualisieren</>
             </button>
-            {devices.error && <p className="text-[#a32020] text-sm">{devices.error}</p>}
+            {devices.error && <p className="text-fehler text-sm">{devices.error}</p>}
             {devices.list.length === 0 && !devices.loading && !devices.error && (
               <p className="text-leise text-sm">Kein Gerät verbunden — läuft der Agent?</p>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {devices.list.map(d => (
-                <div key={d.deviceId} className="bg-white p-4 rounded border border-linie hover:border-[#d8d4cd] transition-colors">
+                <div key={d.deviceId} className="bg-white p-4 rounded-xl shadow-sm border border-linie hover:border-akzent-rand transition-colors">
                   <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${d.online ? 'bg-emerald-500' : 'bg-[#ddd8d1]'}`} />
-                    <h3 className="font-bold text-tinte">{d.hostname}</h3>
-                    <span className="text-[10px] uppercase font-bold text-leise ml-auto">{d.driver}</span>
+                    <span className={`w-2 h-2 rounded-full ${d.online ? 'bg-erfolg' : 'bg-linie'}`} />
+                    <h3 className="font-semibold text-tinte">{d.hostname}</h3>
+                    <span className="text-[10px] uppercase font-semibold text-leise ml-auto">{d.driver}</span>
                   </div>
                   <p className="text-sm text-leise">{d.platform} · {d.osVersion}</p>
                   <p className="text-xs text-leise mt-2">zuletzt gesehen: {new Date(d.lastSeen).toLocaleTimeString('de-DE')}</p>

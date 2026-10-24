@@ -97,46 +97,46 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-flaeche">
-      <div className="w-64 bg-white border-r border-linie text-tinte flex flex-col">
-        <div className="p-5 border-b border-linie">
-          <Wortmarke klein className="mb-4" />
-          <p className="text-xs text-gedimmt truncate">{user?.displayName}</p>
-          <span className={`inline-block mt-2 px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider ring-1 ${
-            // Kein zweiter Farbton neben Orange — die Rolle unterscheidet sich
-            // über die Sättigung, nicht über eine neue Farbe.
-            user?.role === 'admin' ? 'bg-akzent text-white ring-akzent'
-              : user?.role === 'it' ? 'bg-akzent-zart text-[#a04c00] ring-akzent-rand'
-              : 'bg-flaeche text-gedimmt ring-linie'
+      {/* Seitenspalte 220px, Marine — die einzige dunkle Fläche der Oberfläche. */}
+      <div className="w-[220px] flex-shrink-0 bg-schiene text-white flex flex-col">
+        <div className="p-4 border-b border-white/10">
+          <Wortmarke klein hell className="mb-4" />
+          <p className="text-xs text-white/70 truncate">{user?.displayName}</p>
+          <span className={`inline-block mt-2 px-2 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider ${
+            // Die Rolle steht für Berechtigung, nicht für einen Zustand — darum
+            // Petrol und Abstufungen davon, nie Bernstein oder Rot.
+            user?.role === 'admin' ? 'bg-akzent text-white'
+              : user?.role === 'it' ? 'bg-akzent/25 text-white'
+              : 'bg-white/10 text-white/70'
           }`}>
             {ROLE_LABEL[user?.role] || user?.role}
           </span>
           {user?.authMode === 'local' && (
             // Sagt, wogegen geprueft wurde: gegen die Konten des Portals, nicht
             // gegen das Unternehmensverzeichnis.
-            <p className="mt-2 text-[10px] leading-snug text-leise">
+            <p className="mt-2 text-[10px] leading-snug text-white/50">
               Lokales Konto (Prototyp)
             </p>
           )}
           {user?.authMode === 'simple' && (
             // Muss sichtbar bleiben: sonst sieht der einfache Weg im Betrieb
             // genauso aus wie eine geprüfte Anmeldung.
-            <p className="mt-2 text-[10px] leading-snug text-[#8a5200]">
+            <p className="mt-2 text-[10px] leading-snug text-warnung-rand">
               Testbetrieb — Identität ungeprüft
             </p>
           )}
         </div>
 
-        <nav className="flex-1 p-3 space-y-1">
-          <p className="text-[10px] uppercase tracking-wide text-leise px-2 pb-1">Bereiche</p>
+        <nav className="flex-1 p-2 space-y-1">
+          <p className="text-[10px] uppercase tracking-wide text-white/40 px-2 pb-1">Bereiche</p>
           {visibleAreas.map(a => {
             const Icon = a.icon;
             return (
               <button key={a.path} onClick={() => go(a.path)}
-                className={`w-full text-left px-3 py-2.5 min-h-[46px] rounded flex items-center gap-2.5 transition-all relative ${
+                className={`w-full text-left px-3 py-2 min-h-[44px] rounded-md flex items-center gap-2.5 transition-colors relative ${
                   area.path === a.path
-                    ? 'bg-akzent-zart text-[#a04c00] ring-1 ring-akzent-rand'
-                    : 'text-gedimmt hover:bg-flaeche hover:text-tinte'}`}>
-                {area.path === a.path && <span className="absolute left-0 top-2.5 bottom-2.5 w-0.5 rounded-full bg-akzent" />}
+                    ? 'bg-akzent text-white'
+                    : 'text-white/70 hover:bg-white/10 hover:text-white'}`}>
                 <Icon size={16} className="flex-shrink-0" />
                 <span>
                   <span className="block text-sm font-medium">{a.name}</span>
@@ -147,34 +147,34 @@ export default function App() {
           })}
         </nav>
 
-        <div className="p-3 border-t border-linie space-y-1">
+        <div className="p-2 border-t border-white/10 space-y-1">
           {user?.authMode === 'local' && (
             <button onClick={() => setPasswortOffen(true)}
-              className="w-full flex items-center gap-2 px-3 py-2 text-gedimmt hover:bg-flaeche hover:text-tinte rounded text-sm transition-colors">
+              className="w-full flex items-center gap-2 px-3 py-2 text-white/70 hover:bg-white/10 hover:text-white rounded-md text-sm transition-colors">
               <KeyRound size={16} /> Passwort ändern
             </button>
           )}
           <button onClick={() => (authMode() === 'off' ? setAuthenticated(false) : signOut())}
-            className="w-full flex items-center gap-2 px-3 py-2 text-gedimmt hover:bg-flaeche hover:text-tinte rounded text-sm transition-colors">
+            className="w-full flex items-center gap-2 px-3 py-2 text-white/70 hover:bg-white/10 hover:text-white rounded-md text-sm transition-colors">
             <LogOut size={16} /> Abmelden
           </button>
         </div>
       </div>
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="bg-white/80 border-b border-linie px-6 h-[68px] flex flex-col justify-center backdrop-blur">
-          <h1 className="font-semibold text-tinte">{area.name}</h1>
-          {area.subtitle && <p className="text-xs text-leise">{area.subtitle}</p>}
+        <div className="bg-white border-b border-linie px-6 h-[68px] flex flex-col justify-center">
+          <h1 className="text-2xl font-semibold text-tinte leading-tight">{area.name}</h1>
+          {area.subtitle && <p className="text-xs text-gedimmt">{area.subtitle}</p>}
         </div>
 
         {allowed ? <Body /> : (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <p className="text-lg font-bold text-tinte mb-1">Kein Zugriff</p>
-              <p className="text-sm text-leise mb-4">
+              <p className="text-lg font-semibold text-tinte mb-1">Kein Zugriff</p>
+              <p className="text-sm text-gedimmt mb-4">
                 Dieser Bereich ist der Rolle „{ROLE_LABEL[area.min]}" vorbehalten. Du bist „{ROLE_LABEL[user?.role]}".
               </p>
-              <button onClick={() => go('/')} className="px-4 py-2 bg-akzent hover:bg-akzent-hell text-white rounded text-sm">
+              <button onClick={() => go('/')} className="px-4 py-2 bg-akzent hover:bg-akzent-hell text-white rounded-md text-sm">
                 Zum Mitarbeiter-Portal
               </button>
             </div>

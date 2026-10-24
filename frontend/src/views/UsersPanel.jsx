@@ -85,17 +85,17 @@ export default function UsersPanel() {
     <div>
       <div className="flex items-center gap-3 mb-3">
         <button onClick={() => setFormOffen((o) => !o)}
-          className="px-4 py-2 bg-akzent hover:bg-akzent-hell text-white rounded text-sm transition-colors flex items-center gap-2">
+          className="px-4 py-2 bg-akzent hover:bg-akzent-hell text-white rounded-md text-sm transition-colors flex items-center gap-2">
           <UserPlus size={15} /> Konto anlegen
         </button>
         <button onClick={load}
-          className="px-3 py-2 text-gedimmt hover:bg-flaeche border border-[#d8d4cd] rounded text-sm transition-colors flex items-center gap-2">
+          className="px-3 py-2 text-gedimmt hover:bg-flaeche border border-linie rounded-md text-sm transition-colors flex items-center gap-2">
           <RefreshCw size={14} className={state.loading ? 'animate-spin' : ''} /> Aktualisieren
         </button>
       </div>
 
       {state.defaultsPending.length > 0 && (
-        <div className="mb-3 flex gap-2 items-start p-3 rounded bg-[#fdf3e2] border border-[#e9c98f] text-[#8a5200] text-xs">
+        <div className="mb-3 flex gap-2 items-start p-3 rounded bg-warnung-zart border border-warnung-rand text-warnung text-xs">
           <ShieldAlert size={16} className="shrink-0 mt-0.5" />
           <span>
             Mit ausgeliefertem Passwort: <strong>{state.defaultsPending.join(', ')}</strong>.
@@ -132,7 +132,7 @@ export default function UsersPanel() {
             </div>
           </div>
           <button onClick={anlegen} disabled={!neu.username || !neu.password}
-            className="mt-3 px-4 py-2 bg-akzent hover:bg-akzent-hell disabled:bg-[#ddd8d1] disabled:text-leise text-white rounded text-sm transition-colors">
+            className="mt-3 px-4 py-2 bg-akzent hover:bg-akzent-hell disabled:bg-linie disabled:text-leise text-white rounded-md text-sm transition-colors">
             Anlegen
           </button>
         </div>
@@ -140,20 +140,20 @@ export default function UsersPanel() {
 
       {meldung && (
         <div className={`mb-3 p-3 rounded border text-sm ${meldung.ok
-          ? 'bg-[#e9f5ec] border-[#b7dcc1] text-[#1f6b39]'
-          : 'bg-[#fbeaea] border-[#e8bcbc] text-[#a32020]'}`}>
+          ? 'bg-erfolg-zart border-erfolg-rand text-erfolg'
+          : 'bg-fehler-zart border-fehler-rand text-fehler'}`}>
           {meldung.text}
         </div>
       )}
 
       {state.error && (
-        <div className="mb-3 p-3 rounded border bg-[#fbeaea] border-[#e8bcbc] text-[#a32020] text-sm">{state.error}</div>
+        <div className="mb-3 p-3 rounded border bg-fehler-zart border-fehler-rand text-fehler text-sm">{state.error}</div>
       )}
 
-      <div className="bg-white border border-linie rounded overflow-hidden">
+      <div className="bg-white border border-linie rounded-xl shadow-sm overflow-hidden">
         {state.users.map((u) => (
           <div key={u.id} className="px-4 py-3 border-b border-linie last:border-0 flex items-center gap-3 flex-wrap">
-            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${u.active ? 'bg-emerald-500' : 'bg-[#ddd8d1]'}`} />
+            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${u.active ? 'bg-erfolg' : 'bg-linie'}`} />
             <span className="font-medium text-tinte w-48 truncate">{u.username}</span>
             <span className="text-sm text-leise w-40 truncate">{u.displayName}</span>
 
@@ -170,7 +170,7 @@ export default function UsersPanel() {
               // bleibt es, damit beim Umzug in den Betrieb niemand uebersieht,
               // dass `admin/admin` noch gilt.
               <span title="Dieses Konto hat noch das ausgelieferte Passwort. Niemand muss es ändern — gut zu wissen ist es trotzdem."
-                className="text-[10px] uppercase font-bold tracking-wide text-[#8a5200] bg-[#fdf3e2] ring-1 ring-[#e9c98f] rounded px-1.5 py-0.5">
+                className="text-[10px] uppercase font-semibold tracking-wide text-warnung bg-warnung-zart ring-1 ring-warnung-rand rounded px-1.5 py-0.5">
                 Startpasswort
               </span>
             )}
@@ -189,7 +189,7 @@ export default function UsersPanel() {
                 {u.active ? <Lock size={15} /> : <Unlock size={15} />}
               </button>
               <button onClick={() => loeschen(u)} title="Löschen"
-                className="p-2 text-gedimmt hover:text-[#a32020] hover:bg-flaeche rounded transition-colors">
+                className="p-2 text-gedimmt hover:text-fehler hover:bg-flaeche rounded transition-colors">
                 <Trash2 size={15} />
               </button>
             </div>

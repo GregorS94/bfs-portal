@@ -147,7 +147,7 @@ export default function UserPortal() {
               {messages.length === 0 && (
                 <div className="h-full flex flex-col items-center justify-center text-center px-6">
                   <MessageSquare size={26} className="text-akzent mb-4" strokeWidth={1.5} />
-                  <h2 className="font-kopf text-xl font-bold text-tinte mb-1">Wobei kann der Support helfen?</h2>
+                  <h2 className="font-kopf text-xl font-semibold text-tinte mb-1">Wobei kann der Support helfen?</h2>
                   <p className="text-sm text-leise mb-6 max-w-md">
                     Beschreib dein Problem in eigenen Worten. Ich sehe bei Bedarf selbst auf deinem Gerät nach —
                     Änderungen führe ich erst nach deiner Freigabe aus.
@@ -160,7 +160,7 @@ export default function UserPortal() {
                       'VPN verbindet sich nicht'
                     ].map(v => (
                       <button key={v} onClick={() => setInputValue(v)}
-                        className="px-3 py-1.5 text-sm text-gedimmt bg-white border border-linie hover:border-[#c9c3ba] hover:text-tinte rounded transition-colors">
+                        className="px-3 py-1.5 text-sm text-gedimmt bg-white border border-linie hover:border-akzent-rand hover:text-tinte rounded transition-colors">
                         {v}
                       </button>
                     ))}
@@ -190,21 +190,21 @@ export default function UserPortal() {
 
               {pendingApprovals.map(a => (
                 <div key={a.jobId} className="flex justify-start">
-                  <div className="max-w-2xl bg-[#fdf3e2] border border-[#e9c98f] rounded-md p-4 rise-in">
-                    <div className="flex items-center gap-2 font-bold text-[#8a5200] mb-2">
+                  <div className="max-w-2xl bg-warnung-zart border border-warnung-rand rounded-md p-4 rise-in">
+                    <div className="flex items-center gap-2 font-semibold text-warnung mb-2">
                       <ShieldAlert size={18} /> Freigabe erforderlich
                     </div>
-                    <p className="text-sm text-[#8a5200] mb-1">
-                      Aktion <span className="font-mono font-bold">{a.action}</span> auf <span className="font-bold">{a.device}</span>
+                    <p className="text-sm text-warnung mb-1">
+                      Aktion <span className="font-mono font-semibold">{a.action}</span> auf <span className="font-semibold">{a.device}</span>
                     </p>
                     {Object.keys(a.params || {}).length > 0 && (
-                      <pre className="text-xs bg-white border border-[#e9c98f] rounded p-2 mb-3 overflow-x-auto">
+                      <pre className="text-xs bg-white border border-warnung-rand rounded p-2 mb-3 overflow-x-auto">
                         {JSON.stringify(a.params, null, 2)}
                       </pre>
                     )}
                     <div className="flex gap-2">
-                      <button onClick={() => decideApproval(a.jobId, true)} className="px-3.5 py-1.5 bg-akzent hover:bg-akzent-hell text-white rounded text-sm font-medium transition-colors">Ausführen</button>
-                      <button onClick={() => decideApproval(a.jobId, false)} className="px-3.5 py-1.5 text-gedimmt hover:bg-flaeche border border-[#d8d4cd] rounded text-sm transition-colors">Ablehnen</button>
+                      <button onClick={() => decideApproval(a.jobId, true)} className="px-3.5 py-1.5 bg-akzent hover:bg-akzent-hell text-white rounded-md text-sm font-medium transition-colors">Ausführen</button>
+                      <button onClick={() => decideApproval(a.jobId, false)} className="px-3.5 py-1.5 text-gedimmt hover:bg-flaeche border border-linie rounded-md text-sm transition-colors">Ablehnen</button>
                     </div>
                   </div>
                 </div>
@@ -220,9 +220,9 @@ export default function UserPortal() {
               <input type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleChatSubmit()} disabled={loading}
                 placeholder="Problem beschreiben…"
-                className="flex-1 px-4 py-3 border border-[#d8d4cd] rounded focus:outline-none focus:ring-2 focus:ring-akzent" />
+                className="flex-1 px-4 py-3 border border-linie rounded focus:outline-none focus:ring-2 focus:ring-akzent" />
               <button onClick={handleChatSubmit} disabled={loading}
-                className="px-4 py-3 bg-akzent hover:bg-akzent-hell disabled:bg-[#ddd8d1] disabled:text-leise text-white rounded">
+                className="px-4 py-3 bg-akzent hover:bg-akzent-hell disabled:bg-linie disabled:text-leise text-white rounded">
                 <Send size={20} />
               </button>
             </div>
@@ -232,7 +232,7 @@ export default function UserPortal() {
         {activeTab === 'teams' && (
           <div className="h-full flex flex-col items-center justify-center text-center px-6">
             <MessagesSquare size={26} className="text-akzent mb-4" strokeWidth={1.5} />
-            <h2 className="font-kopf text-xl font-bold text-tinte mb-1">Der Support sitzt in Microsoft Teams</h2>
+            <h2 className="font-kopf text-xl font-semibold text-tinte mb-1">Der Support sitzt in Microsoft Teams</h2>
             <p className="text-sm text-leise mb-6 max-w-md">
               Probleme, Anliegen und Anfragen laufen über den Chat <span className="font-semibold">BFS IT-Service</span>
               {' '}in Teams — entweder über Copilot oder über <span className="font-mono">@BFS-Bot</span>. Dort sieht der

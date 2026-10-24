@@ -74,7 +74,7 @@ export default function KioskApprovals() {
     <div>
       <div className="flex items-center gap-3 mb-3">
         <button onClick={load}
-          className="px-4 py-2 bg-akzent hover:bg-akzent-hell text-white rounded text-sm transition-colors flex items-center gap-2">
+          className="px-4 py-2 bg-akzent hover:bg-akzent-hell text-white rounded-md text-sm transition-colors flex items-center gap-2">
           <RefreshCw size={14} className={state.loading ? 'animate-spin' : ''} /> Aktualisieren
         </button>
         <span className="text-sm text-leise">{offen.length} offen</span>
@@ -82,17 +82,17 @@ export default function KioskApprovals() {
 
       {meldung && (
         <div className={`mb-3 p-3 rounded border text-sm ${meldung.ok
-          ? 'bg-[#e9f5ec] border-[#b7dcc1] text-[#1f6b39]'
-          : 'bg-[#fbeaea] border-[#e8bcbc] text-[#a32020]'}`}>
+          ? 'bg-erfolg-zart border-erfolg-rand text-erfolg'
+          : 'bg-fehler-zart border-fehler-rand text-fehler'}`}>
           {meldung.text}
         </div>
       )}
       {state.error && (
-        <div className="mb-3 p-3 rounded border bg-[#fbeaea] border-[#e8bcbc] text-[#a32020] text-sm">{state.error}</div>
+        <div className="mb-3 p-3 rounded border bg-fehler-zart border-fehler-rand text-fehler text-sm">{state.error}</div>
       )}
 
       {offen.map((r) => (
-        <div key={r.id} className="mb-3 p-4 bg-white border border-[#e9c98f] rounded">
+        <div key={r.id} className="mb-3 p-4 bg-white border border-warnung-rand rounded">
           <p className="text-sm text-tinte mb-1">
             <strong>{r.username}</strong> möchte <strong>{r.jobName}</strong>
           </p>
@@ -107,26 +107,26 @@ export default function KioskApprovals() {
               placeholder="Zuweisungsziel (AD-Objekt oder Gerät)"
               className="px-3 py-2 w-72 bg-white border border-linie rounded text-sm focus:outline-none focus:ring-2 focus:ring-akzent/50" />
             <button onClick={() => suche(r)} title={`Im Verzeichnis suchen (Vorgabe: ${r.username})`}
-              className="px-3 py-2 min-h-[38px] text-gedimmt hover:bg-flaeche border border-[#d8d4cd] rounded text-sm transition-colors flex items-center gap-1.5">
+              className="px-3 py-2 min-h-[38px] text-gedimmt hover:bg-flaeche border border-linie rounded-md text-sm transition-colors flex items-center gap-1.5">
               <Search size={15} className={treffer[r.id]?.laeuft ? 'animate-pulse' : ''} /> Suchen
             </button>
             <button onClick={() => entscheide(r, 'release', { assignmentTargetId: (ziel[r.id] || '').trim() },
               `„${r.jobName}" für ${r.username} freigegeben.`)}
               disabled={!(ziel[r.id] || '').trim()}
-              className="px-3.5 py-2 bg-akzent hover:bg-akzent-hell disabled:bg-[#ddd8d1] disabled:text-leise text-white rounded text-sm font-medium transition-colors flex items-center gap-1.5">
+              className="px-3.5 py-2 bg-akzent hover:bg-akzent-hell disabled:bg-linie disabled:text-leise text-white rounded-md text-sm font-medium transition-colors flex items-center gap-1.5">
               <CheckCircle size={15} /> Freigeben
             </button>
             <button onClick={() => {
               const grund = window.prompt('Begründung (erscheint beim Anfordernden):') || '';
               entscheide(r, 'deny', { note: grund }, `„${r.jobName}" für ${r.username} abgelehnt.`);
             }}
-              className="px-3.5 py-2 text-gedimmt hover:bg-flaeche border border-[#d8d4cd] rounded text-sm transition-colors flex items-center gap-1.5">
+              className="px-3.5 py-2 text-gedimmt hover:bg-flaeche border border-linie rounded-md text-sm transition-colors flex items-center gap-1.5">
               <XCircle size={15} /> Ablehnen
             </button>
           </div>
 
           {treffer[r.id]?.error && (
-            <p className="mt-2 text-xs text-[#a32020]">{treffer[r.id].error}</p>
+            <p className="mt-2 text-xs text-fehler">{treffer[r.id].error}</p>
           )}
           {treffer[r.id]?.groups && (
             <div className="mt-2 border border-linie rounded bg-flaeche p-2">
@@ -135,7 +135,7 @@ export default function KioskApprovals() {
               )}
               {treffer[r.id].groups.map((g) => (
                 <div key={g.quelle} className="mb-1 last:mb-0">
-                  {g.problem && <p className="text-xs text-[#8a5200]">{g.quelle}: {g.problem}</p>}
+                  {g.problem && <p className="text-xs text-warnung">{g.quelle}: {g.problem}</p>}
                   {g.ziele.map((z) => (
                     <button key={z.id}
                       onClick={() => setZiel({ ...ziel, [r.id]: z.id })}
@@ -159,7 +159,7 @@ export default function KioskApprovals() {
       {rest.length > 0 && (
         <>
           <h2 className="mt-6 mb-2 text-sm font-semibold uppercase tracking-wide text-leise">Verlauf</h2>
-          <div className="bg-white border border-linie rounded overflow-hidden">
+          <div className="bg-white border border-linie rounded-xl shadow-sm overflow-hidden">
             {rest.map((r) => (
               <div key={r.id} className="px-4 py-3 border-b border-linie last:border-0 flex items-center gap-3 flex-wrap text-sm">
                 <span className="text-leise font-mono text-xs w-36 truncate">{r.username}</span>
@@ -172,7 +172,7 @@ export default function KioskApprovals() {
                 </span>
                 {r.state === 'released' && (
                   <button onClick={() => entscheide(r, 'withdraw', {}, `Freigabe für „${r.jobName}" zurückgezogen.`)}
-                    className="ml-auto px-3 py-1.5 text-gedimmt hover:bg-flaeche border border-[#d8d4cd] rounded text-xs transition-colors flex items-center gap-1.5">
+                    className="ml-auto px-3 py-1.5 text-gedimmt hover:bg-flaeche border border-linie rounded text-xs transition-colors flex items-center gap-1.5">
                     <Undo2 size={13} /> Zurückziehen
                   </button>
                 )}

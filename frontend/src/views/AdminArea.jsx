@@ -71,7 +71,7 @@ export default function AdminArea() {
 
           {activeTab === 'dienste' && (<>
             <div className="flex items-center gap-3 mb-4">
-              <button onClick={load} className="px-4 py-2 bg-akzent hover:bg-akzent-hell text-white rounded transition-colors flex items-center gap-2">
+              <button onClick={load} className="px-4 py-2 bg-akzent hover:bg-akzent-hell text-white rounded-md transition-colors flex items-center gap-2">
                 <RefreshCw size={16} className={health.loading ? 'animate-spin' : ''} /> Prüfen
               </button>
               {health.checkedAt && (
@@ -82,37 +82,37 @@ export default function AdminArea() {
             </div>
 
             {health.error && (
-              <div className="mb-4 px-4 py-3 rounded border font-semibold bg-[#fbeaea] border-[#e8bcbc] text-[#a32020]">
+              <div className="mb-4 px-4 py-3 rounded border font-semibold bg-fehler-zart border-fehler-rand text-fehler">
                 Die Prüfung selbst ist fehlgeschlagen — die Liste unten sagt nichts über den Zustand der Dienste aus.
               </div>
             )}
 
             {health.services.length > 0 && (
               <div className={`mb-4 px-4 py-3 rounded border font-semibold ${
-                bad.length ? 'bg-[#fbeaea] border-[#e8bcbc] text-[#a32020]'
-                  : warn.length ? 'bg-[#fdf3e2] border-[#e9c98f] text-[#8a5200]'
-                  : 'bg-[#e9f5ec] border-[#b7dcc1] text-[#1f6b39]'}`}>
+                bad.length ? 'bg-fehler-zart border-fehler-rand text-fehler'
+                  : warn.length ? 'bg-warnung-zart border-warnung-rand text-warnung'
+                  : 'bg-erfolg-zart border-erfolg-rand text-erfolg'}`}>
                 {bad.length ? `${bad.length} Dienst${bad.length > 1 ? 'e' : ''} gestört`
                   : warn.length ? `${warn.length} Warnung${warn.length > 1 ? 'en' : ''}`
                   : 'Alle Dienste laufen'}
               </div>
             )}
 
-            <div className="bg-white border border-linie rounded overflow-hidden">
+            <div className="bg-white border border-linie rounded-xl shadow-sm overflow-hidden">
               {health.services.map(svc => {
-                const dot = { ok: 'bg-emerald-500', warn: 'bg-amber-500', error: 'bg-rose-500', off: 'bg-[#ddd8d1]' }[svc.status];
+                const dot = { ok: 'bg-erfolg', warn: 'bg-warnung', error: 'bg-fehler', off: 'bg-leise' }[svc.status];
                 const label = { ok: 'OK', warn: 'Warnung', error: 'Fehler', off: 'Inaktiv' }[svc.status];
                 return (
                   <div key={svc.key} className="px-4 py-3 border-b border-linie last:border-0 flex items-center gap-3">
                     <span className={`w-3 h-3 rounded-full flex-shrink-0 ${dot}`} />
                     <span className="font-medium text-tinte w-48 flex-shrink-0">{svc.name}</span>
-                    <span className="text-xs font-bold text-leise w-20 flex-shrink-0">{label}</span>
+                    <span className="text-xs font-semibold text-leise w-20 flex-shrink-0">{label}</span>
                     <span className="text-sm text-leise truncate">{svc.detail}</span>
                   </div>
                 );
               })}
               {!health.services.length && !health.loading && (
-                <p className="p-4 text-sm text-[#a32020]">Status konnte nicht geladen werden — läuft das Backend?</p>
+                <p className="p-4 text-sm text-fehler">Status konnte nicht geladen werden — läuft das Backend?</p>
               )}
             </div>
 

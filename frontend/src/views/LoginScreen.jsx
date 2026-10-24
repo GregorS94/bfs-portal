@@ -41,9 +41,10 @@ export default function LoginScreen({ mode, ready, onSimpleSignIn, onLocalSignIn
   return (
     <div className="flex items-center justify-center h-screen bg-flaeche px-4">
       <div className="w-full max-w-sm text-center">
-        <Wortmarke className="mx-auto mb-6" />
-        <h1 className="text-2xl font-semibold text-tinte mb-1">BFS IT-Support</h1>
-        <p className="text-sm text-leise mb-8">Self-Service Portal</p>
+        {/* Die Wortmarke trägt den Namen schon — eine zweite Überschrift
+            darunter wiederholte ihn nur. */}
+        <Wortmarke mittig className="mb-2" />
+        <p className="text-sm text-gedimmt mb-8">Anmeldung</p>
 
         {!ready && <p className="text-sm text-leise">Einen Moment…</p>}
 
@@ -67,13 +68,13 @@ export default function LoginScreen({ mode, ready, onSimpleSignIn, onLocalSignIn
               onKeyDown={(e) => e.key === 'Enter' && localReady && submitLocal()}
               placeholder="••••" className={field} />
             <button onClick={submitLocal} disabled={busy || !localReady}
-              className="w-full px-6 py-2.5 bg-akzent hover:bg-akzent-hell disabled:bg-[#ddd8d1] disabled:text-leise text-white rounded font-medium text-sm transition-colors flex items-center justify-center gap-2">
+              className="w-full px-6 py-2.5 bg-akzent hover:bg-akzent-hell disabled:bg-linie disabled:text-leise text-white rounded font-medium text-sm transition-colors flex items-center justify-center gap-2">
               <KeyRound size={15} /> {busy ? 'Anmelden…' : 'Anmelden'}
             </button>
             {/* Muss hier stehen und nicht nur in der Dokumentation: solange die
                 ausgelieferten Passwoerter gelten, ist das Portal fuer jeden
                 offen, der diesen Satz kennt. */}
-            <div className="flex gap-2 items-start p-3 rounded bg-[#fdf3e2] border border-[#e9c98f] text-[#8a5200] text-xs">
+            <div className="flex gap-2 items-start p-3 rounded bg-warnung-zart border border-warnung-rand text-warnung text-xs">
               <ShieldAlert size={16} className="shrink-0 mt-0.5" />
               <span>
                 Prototyp: Geprüft wird gegen die Konten des Portals, nicht gegen das
@@ -86,7 +87,7 @@ export default function LoginScreen({ mode, ready, onSimpleSignIn, onLocalSignIn
 
         {ready && mode === 'simple' && (
           <div className="space-y-3 text-left">
-            <div className="flex gap-2 items-start p-3 rounded bg-[#fdf3e2] border border-[#e9c98f] text-[#8a5200] text-xs">
+            <div className="flex gap-2 items-start p-3 rounded bg-warnung-zart border border-warnung-rand text-warnung text-xs">
               <ShieldAlert size={16} className="shrink-0 mt-0.5" />
               <span>Testbetrieb: Der Name wird <strong>nicht geprüft</strong>. Das ist keine Anmeldung im Sinne einer Authentifizierung.</span>
             </div>
@@ -96,14 +97,14 @@ export default function LoginScreen({ mode, ready, onSimpleSignIn, onLocalSignIn
               onKeyDown={(e) => e.key === 'Enter' && identity.trim() && submitSimple()}
               placeholder="a.muster@bfs.de" className={field} />
             <button onClick={submitSimple} disabled={busy || !identity.trim()}
-              className="w-full px-6 py-2.5 bg-akzent hover:bg-akzent-hell disabled:bg-[#ddd8d1] disabled:text-leise text-white rounded font-medium text-sm transition-colors">
+              className="w-full px-6 py-2.5 bg-akzent hover:bg-akzent-hell disabled:bg-linie disabled:text-leise text-white rounded font-medium text-sm transition-colors">
               {busy ? 'Anmelden…' : 'Weiter'}
             </button>
           </div>
         )}
 
         {error && (
-          <div className="mt-4 p-3 rounded bg-[#fbeaea] border border-[#e8bcbc] text-rose-200 text-sm text-left">
+          <div className="mt-4 p-3 rounded bg-fehler-zart border border-fehler-rand text-fehler text-sm text-left">
             {error}
           </div>
         )}

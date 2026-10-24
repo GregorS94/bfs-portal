@@ -7,9 +7,9 @@ import { authedFetch } from '../auth';
 // docs/BARAMUNDI.md: Freigabe und Ausführung liegen damit in verschiedenen
 // Händen, ohne dass wir dafür ein Vier-Augen-Verfahren bauen müssten.
 const ZUSTAND = {
-  requested: { label: 'wartet auf Freigabe', icon: Clock, klasse: 'bg-[#fdf3e2] text-[#8a5200] ring-[#e9c98f]' },
-  released: { label: 'freigegeben', icon: CheckCircle, klasse: 'bg-[#e9f5ec] text-[#1f6b39] ring-[#b7dcc1]' },
-  denied: { label: 'abgelehnt', icon: XCircle, klasse: 'bg-[#fbeaea] text-[#a32020] ring-[#e8bcbc]' },
+  requested: { label: 'wartet auf Freigabe', icon: Clock, klasse: 'bg-warnung-zart text-warnung ring-warnung-rand' },
+  released: { label: 'freigegeben', icon: CheckCircle, klasse: 'bg-erfolg-zart text-erfolg ring-erfolg-rand' },
+  denied: { label: 'abgelehnt', icon: XCircle, klasse: 'bg-fehler-zart text-fehler ring-fehler-rand' },
   withdrawn: { label: 'zurückgezogen', icon: XCircle, klasse: 'bg-flaeche text-gedimmt ring-linie' }
 };
 
@@ -54,7 +54,7 @@ export default function KioskPanel() {
   return (
     <div>
       {state.error && (
-        <div className="mb-4 p-3 rounded border bg-[#fbeaea] border-[#e8bcbc] text-[#a32020] text-sm">{state.error}</div>
+        <div className="mb-4 p-3 rounded border bg-fehler-zart border-fehler-rand text-fehler text-sm">{state.error}</div>
       )}
 
       {!state.ready && !state.loading && !state.error && (
@@ -72,15 +72,15 @@ export default function KioskPanel() {
       )}
 
       {state.problem && (
-        <div className="mb-4 p-3 rounded border bg-[#fdf3e2] border-[#e9c98f] text-[#8a5200] text-sm">
+        <div className="mb-4 p-3 rounded border bg-warnung-zart border-warnung-rand text-warnung text-sm">
           Der Katalog konnte nicht geladen werden: {state.problem}
         </div>
       )}
 
       {meldung && (
         <div className={`mb-4 p-3 rounded border text-sm ${meldung.ok
-          ? 'bg-[#e9f5ec] border-[#b7dcc1] text-[#1f6b39]'
-          : 'bg-[#fbeaea] border-[#e8bcbc] text-[#a32020]'}`}>
+          ? 'bg-erfolg-zart border-erfolg-rand text-erfolg'
+          : 'bg-fehler-zart border-fehler-rand text-fehler'}`}>
           {meldung.text}
         </div>
       )}
@@ -93,14 +93,14 @@ export default function KioskPanel() {
               <RefreshCw size={13} className={state.loading ? 'animate-spin' : ''} />
             </button>
           </div>
-          <div className="mb-6 bg-white border border-linie rounded overflow-hidden">
+          <div className="mb-6 bg-white border border-linie rounded-xl shadow-sm overflow-hidden">
             {state.requests.map((r) => {
               const z = ZUSTAND[r.state] || ZUSTAND.requested;
               const Symbol = z.icon;
               return (
                 <div key={r.id} className="px-4 py-3 border-b border-linie last:border-0 flex items-center gap-3 flex-wrap">
                   <span className="font-medium text-tinte w-56 truncate">{r.jobName}</span>
-                  <span className={`text-[10px] uppercase font-bold tracking-wide ring-1 rounded px-1.5 py-0.5 flex items-center gap-1 ${z.klasse}`}>
+                  <span className={`text-[10px] uppercase font-semibold tracking-wide ring-1 rounded px-1.5 py-0.5 flex items-center gap-1 ${z.klasse}`}>
                     <Symbol size={11} /> {z.label}
                   </span>
                   <span className="text-xs text-leise ml-auto">
@@ -127,14 +127,14 @@ export default function KioskPanel() {
           <h2 className="text-sm font-semibold uppercase tracking-wide text-leise mb-2">Verfügbar</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {state.jobs.map((job) => (
-              <div key={job.id} className="bg-white p-4 rounded border border-linie hover:border-[#d8d4cd] transition-colors flex flex-col">
+              <div key={job.id} className="bg-white p-4 rounded-xl shadow-sm border border-linie hover:border-akzent-rand transition-colors flex flex-col">
                 <div className="flex items-start gap-2 mb-1">
                   <Package size={16} className="text-akzent shrink-0 mt-0.5" />
-                  <h3 className="font-bold text-tinte">{job.name}</h3>
+                  <h3 className="font-semibold text-tinte">{job.name}</h3>
                 </div>
                 <p className="text-sm text-leise flex-1 mb-3">{job.comment || 'Keine Beschreibung hinterlegt.'}</p>
                 <button onClick={() => anfordern(job)} disabled={offen.has(job.id)}
-                  className="self-start px-3.5 py-1.5 bg-akzent hover:bg-akzent-hell disabled:bg-[#ddd8d1] disabled:text-leise text-white rounded text-sm font-medium transition-colors">
+                  className="self-start px-3.5 py-1.5 bg-akzent hover:bg-akzent-hell disabled:bg-linie disabled:text-leise text-white rounded-md text-sm font-medium transition-colors">
                   {offen.has(job.id) ? 'läuft schon' : 'Anfordern'}
                 </button>
               </div>

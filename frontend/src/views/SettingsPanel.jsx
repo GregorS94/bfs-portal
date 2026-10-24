@@ -92,7 +92,7 @@ export default function SettingsPanel() {
   };
 
   if (!data) return <div className="text-leise text-sm">Einstellungen werden geladen…</div>;
-  if (data.error) return <div className="text-[#a32020] text-sm">Einstellungen konnten nicht geladen werden.</div>;
+  if (data.error) return <div className="text-fehler text-sm">Einstellungen konnten nicht geladen werden.</div>;
 
   return (
     <div className="space-y-4">
@@ -107,8 +107,8 @@ export default function SettingsPanel() {
             <div className="flex items-center gap-3 mb-1">
               <h3 className="font-semibold text-tinte">{title}</h3>
               <span className={`text-xs px-2 py-0.5 rounded-full ${ready
-                ? 'bg-[#e9f5ec] text-[#1f6b39] border border-[#b7dcc1]'
-                : 'bg-flaeche text-gedimmt border border-[#d8d4cd]'}`}>
+                ? 'bg-erfolg-zart text-erfolg border border-erfolg-rand'
+                : 'bg-flaeche text-gedimmt border border-linie'}`}>
                 {ready ? 'verbunden' : 'unvollständig'}
               </span>
             </div>
@@ -123,7 +123,7 @@ export default function SettingsPanel() {
                     defaultValue={field.value}
                     onChange={e => setDraft(group, key, e.target.value)}
                     className="w-full px-3 py-2 bg-flaeche border border-linie rounded
-                               text-tinte text-sm focus:border-indigo-500 focus:outline-none"
+                               text-tinte text-sm focus:border-akzent focus:outline-none"
                   />
                 </label>
               ))}
@@ -134,11 +134,11 @@ export default function SettingsPanel() {
                     {secret.label}
                     {secret.set && (
                       <>
-                        <span className="text-emerald-400"> · hinterlegt</span>
+                        <span className="text-erfolg"> · hinterlegt</span>
                         <button
                           type="button"
                           onClick={() => clearSecret(group, key)}
-                          className="ml-2 text-leise hover:text-[#a32020] underline"
+                          className="ml-2 text-leise hover:text-fehler underline"
                         >
                           entfernen
                         </button>
@@ -151,7 +151,7 @@ export default function SettingsPanel() {
                     placeholder={secret.set ? 'unverändert lassen' : 'noch nicht hinterlegt'}
                     onChange={e => setDraft(group, key, e.target.value)}
                     className="w-full px-3 py-2 bg-flaeche border border-linie rounded
-                               text-tinte text-sm focus:border-indigo-500 focus:outline-none"
+                               text-tinte text-sm focus:border-akzent focus:outline-none"
                   />
                 </label>
               ))}
@@ -162,7 +162,7 @@ export default function SettingsPanel() {
                 onClick={() => save(group)}
                 disabled={busy.startsWith('save')}
                 className="px-4 py-2 bg-akzent hover:bg-akzent-hell disabled:opacity-50
-                           text-white rounded text-sm flex items-center gap-2 transition-colors"
+                           text-white rounded-md text-sm flex items-center gap-2 transition-colors"
               >
                 {busy === `save:${group}` ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
                 Speichern
@@ -170,7 +170,7 @@ export default function SettingsPanel() {
               <button
                 onClick={() => test(group)}
                 disabled={busy.startsWith('test')}
-                className="px-4 py-2 bg-flaeche hover:bg-[#ddd8d1] disabled:opacity-50
+                className="px-4 py-2 bg-flaeche hover:bg-linie disabled:opacity-50
                            text-tinte rounded text-sm flex items-center gap-2 transition-colors"
               >
                 {busy === `test:${group}` ? <Loader2 size={15} className="animate-spin" /> : <PlugZap size={15} />}
@@ -178,7 +178,7 @@ export default function SettingsPanel() {
               </button>
 
               {res && (
-                <span className={`text-sm flex items-center gap-1.5 ${res.ok ? 'text-[#1f6b39]' : 'text-[#a32020]'}`}>
+                <span className={`text-sm flex items-center gap-1.5 ${res.ok ? 'text-erfolg' : 'text-fehler'}`}>
                   {res.ok ? <Check size={15} /> : <X size={15} />} {res.detail}
                 </span>
               )}

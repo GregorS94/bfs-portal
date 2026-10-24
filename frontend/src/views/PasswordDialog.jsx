@@ -61,16 +61,16 @@ export default function PasswordDialog({ onClose, onDone }) {
         </div>
 
         {error && (
-          <div className="mt-3 p-2.5 rounded bg-[#fbeaea] border border-[#e8bcbc] text-[#a32020] text-xs">{error}</div>
+          <div className="mt-3 p-2.5 rounded bg-fehler-zart border border-fehler-rand text-fehler text-xs">{error}</div>
         )}
 
         <div className="mt-4 flex gap-2">
           <button onClick={speichern} disabled={busy || !vollstaendig}
-            className="px-4 py-2 bg-akzent hover:bg-akzent-hell disabled:bg-[#ddd8d1] disabled:text-leise text-white rounded text-sm font-medium transition-colors">
+            className="px-4 py-2 bg-akzent hover:bg-akzent-hell disabled:bg-linie disabled:text-leise text-white rounded-md text-sm font-medium transition-colors">
             {busy ? 'Wird gesetzt…' : 'Ändern'}
           </button>
           <button onClick={onClose}
-            className="px-4 py-2 text-gedimmt hover:bg-flaeche border border-[#d8d4cd] rounded text-sm transition-colors">
+            className="px-4 py-2 text-gedimmt hover:bg-flaeche border border-linie rounded-md text-sm transition-colors">
             Abbrechen
           </button>
         </div>

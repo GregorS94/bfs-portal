@@ -3,57 +3,104 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#ffffff" />
-    <title>BFS Self-Service Portal</title>
+    <meta name="theme-color" content="#12233d" />
+    <title>BFS IT-Service</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- Lato und Open Sans sind die Schriften von bfs-abrechnung.de. -->
-    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&family=Open+Sans:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+    <!-- Inter für die Oberfläche, JetBrains Mono für Kennungen und Befehle. -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
     <script src="https://cdn.tailwindcss.com"></script>
+
     <script>
-      // Die Hausfarben stammen nicht aus dem Gefühl, sondern aus der Website:
-      // gemessen an den tatsächlich gerenderten Farben von bfs-abrechnung.de.
-      //   #331d0b  Fließtext, warmes Fast-Schwarz
-      //   #db6900  Akzent, kontraststark genug auf Weiß
-      //   #ff7700  hellere Variante für Hover
-      //   #fdd79a  zarter Aprikoston für Flächen
-      //   #ebebeb  Linien und Trennungen
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              tinte:   '#331d0b',
-              gedimmt: '#6b5c4c',
-              leise:   '#8a7c6c',
-              akzent:  { DEFAULT: '#db6900', hell: '#ff7700', zart: '#fdf1e3', rand: '#f0c79a' },
-              linie:   '#e5e2dd',
-              flaeche: '#f6f5f3'
-            },
-            fontFamily: {
-              sans: ['Open Sans', 'system-ui', 'sans-serif'],
-              kopf: ['Lato', 'Open Sans', 'system-ui', 'sans-serif'],
-              mono: ['JetBrains Mono', 'ui-monospace', 'monospace']
-            },
-            borderRadius: { DEFAULT: '3px', md: '4px', lg: '5px', xl: '6px', '2xl': '8px' }
-          }
-        }
-      };
+      // Zwei Paletten, eine Oberfläche.
+      //
+      // 'petrol' ist der Standard und folgt dem Gestaltungsleitfaden für dieses
+      // Werkzeug: ein internes Revisionswerkzeug, nicht der Kundenauftritt.
+      // Petrol ist die einzige Aktionsfarbe, Marine trägt die Seitenspalte,
+      // Bernstein steht ausschließlich für „wartet auf Freigabe".
+      //
+      // 'orange' ist die Hausfarbe von bfs-abrechnung.de, gemessen an den
+      // tatsächlich gerenderten Farben der Website. Umschalten mit
+      // ?thema=orange — die Wahl bleibt im Browser gespeichert.
+      //
+      // Die Paletten liegen als RGB-Tripel vor, damit Tailwind seine
+      // Deckkraft-Kurzschreibweise (bg-erfolg/15) weiter bedienen kann.
+      (function () {
+        const gewuenscht = new URLSearchParams(location.search).get('thema');
+        if (gewuenscht) localStorage.setItem('thema', gewuenscht);
+        const thema = localStorage.getItem('thema') === 'orange' ? 'orange' : 'petrol';
+        document.documentElement.dataset.thema = thema;
+      })();
     </script>
+
     <style>
-      :root { color-scheme: light; }
+      :root {
+        color-scheme: light;
+
+        /* --- Petrol: Standard ------------------------------------------- */
+        --tinte:        18 35 61;      /* #12233D  Überschriften, Fließtext   */
+        --gedimmt:      91 100 114;    /* #5B6472  Metadaten, Beschriftungen  */
+        --leise:        138 147 160;   /* #8A93A0  Hinweise, Platzhalter      */
+        --akzent:       15 110 110;    /* #0F6E6E  die einzige Aktionsfarbe   */
+        --akzent-hell:  12 90 90;      /* #0C5A5A  gedrückt und überfahren    */
+        --akzent-zart:  230 240 240;   /* #E6F0F0  aktive Navigation          */
+        --akzent-rand:  184 214 214;   /* #B8D6D6                             */
+        --linie:        231 227 218;   /* #E7E3DA  Rahmen und Trennlinien     */
+        --flaeche:      250 248 244;   /* #FAF8F4  Seitenhintergrund          */
+        --schiene:      18 35 61;      /* #12233D  Seitenspalte               */
+        --schiene-tief: 11 24 43;      /* #0B182B  Abschnitte darin           */
+
+        /* Zustände. Nie allein tragend — immer mit Punkt und Text. */
+        --warnung:      183 121 31;    /* #B7791F  wartet auf Freigabe        */
+        --warnung-zart: 251 243 228;   /* #FBF3E4                             */
+        --warnung-rand: 230 210 168;   /* #E6D2A8                             */
+        --fehler:       180 35 24;     /* #B42318  Eskalation, Ablehnung      */
+        --fehler-zart:  253 236 234;   /* #FDECEA                             */
+        --fehler-rand:  240 194 188;   /* #F0C2BC                             */
+        --erfolg:       21 128 61;     /* #15803D  abgeschlossen              */
+        --erfolg-zart:  232 244 236;   /* #E8F4EC                             */
+        --erfolg-rand:  182 220 194;   /* #B6DCC2                             */
+        --lauf:         29 78 216;     /* #1D4ED8  in Bearbeitung             */
+        --lauf-zart:    232 238 252;   /* #E8EEFC                             */
+        --lauf-rand:    187 203 245;   /* #BBCBF5                             */
+        --teams:        91 95 199;     /* #5B5FC7  nur für Microsoft Teams    */
+      }
+
+      /* --- Orange: die Hausfarbe von bfs-abrechnung.de -------------------- */
+      html[data-thema='orange'] {
+        --tinte:        51 29 11;      /* #331D0B */
+        --gedimmt:      107 92 76;     /* #6B5C4C */
+        --leise:        138 124 108;   /* #8A7C6C */
+        --akzent:       219 105 0;     /* #DB6900 */
+        --akzent-hell:  255 119 0;     /* #FF7700 */
+        --akzent-zart:  253 241 227;   /* #FDF1E3 */
+        --akzent-rand:  240 199 154;   /* #F0C79A */
+        --linie:        235 235 235;   /* #EBEBEB */
+        --flaeche:      248 244 240;   /* #F8F4F0 */
+        --schiene:      43 26 12;      /* #2B1A0C */
+        --schiene-tief: 30 18 8;       /* #1E1208 */
+      }
+
       body {
-        font-family: 'Open Sans', system-ui, -apple-system, sans-serif;
-        background: #f6f5f3;
-        color: #331d0b;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        background: rgb(var(--flaeche));
+        color: rgb(var(--tinte));
+        font-size: 0.875rem;
         -webkit-font-smoothing: antialiased;
       }
-      h1, h2, h3 { font-family: 'Lato', 'Open Sans', sans-serif; }
       code, pre, .font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+      /* Kennungen und Zeitstempel stehen untereinander in gleicher Breite —
+         sonst springt die Spalte bei jedem Aktualisieren. */
+      .zahlen { font-variant-numeric: tabular-nums; }
 
       ::-webkit-scrollbar { width: 10px; height: 10px; }
       ::-webkit-scrollbar-track { background: transparent; }
-      ::-webkit-scrollbar-thumb { background: #d8d4cd; border-radius: 5px; border: 2px solid #f6f5f3; }
-      ::-webkit-scrollbar-thumb:hover { background: #bfb9b0; }
+      ::-webkit-scrollbar-thumb {
+        background: rgb(var(--linie)); border-radius: 5px;
+        border: 2px solid rgb(var(--flaeche));
+      }
+      ::-webkit-scrollbar-thumb:hover { background: rgb(var(--leise) / .5); }
 
       @keyframes riseIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
       .rise-in { animation: riseIn .18s ease-out both; }
@@ -62,13 +109,45 @@
       .thinking-dot { animation: pulseDot 1.1s ease-in-out infinite; }
       .thinking-dot:nth-child(2) { animation-delay: .18s; }
       .thinking-dot:nth-child(3) { animation-delay: .36s; }
-
-      /* Überschrift mit orangefarbenem Strich — das Erkennungszeichen der BFS-Seite. */
-      .bfs-strich::after {
-        content: ''; display: block; width: 44px; height: 2px;
-        background: #db6900; margin-top: 6px;
-      }
     </style>
+
+    <script>
+      const farbe = (name) => ({ opacityValue }) =>
+        opacityValue === undefined ? `rgb(var(${name}))` : `rgb(var(${name}) / ${opacityValue})`;
+
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              tinte:   farbe('--tinte'),
+              gedimmt: farbe('--gedimmt'),
+              leise:   farbe('--leise'),
+              akzent:  {
+                DEFAULT: farbe('--akzent'),
+                hell:    farbe('--akzent-hell'),
+                zart:    farbe('--akzent-zart'),
+                rand:    farbe('--akzent-rand')
+              },
+              linie:   farbe('--linie'),
+              flaeche: farbe('--flaeche'),
+              schiene: { DEFAULT: farbe('--schiene'), tief: farbe('--schiene-tief') },
+              warnung: { DEFAULT: farbe('--warnung'), zart: farbe('--warnung-zart'), rand: farbe('--warnung-rand') },
+              fehler:  { DEFAULT: farbe('--fehler'),  zart: farbe('--fehler-zart'),  rand: farbe('--fehler-rand') },
+              erfolg:  { DEFAULT: farbe('--erfolg'),  zart: farbe('--erfolg-zart'),  rand: farbe('--erfolg-rand') },
+              lauf:    { DEFAULT: farbe('--lauf'),    zart: farbe('--lauf-zart'),    rand: farbe('--lauf-rand') },
+              teams:   farbe('--teams')
+            },
+            fontFamily: {
+              sans: ['Inter', 'system-ui', 'sans-serif'],
+              kopf: ['Inter', 'system-ui', 'sans-serif'],
+              mono: ['JetBrains Mono', 'ui-monospace', 'monospace']
+            },
+            // 4/8er-Raster, Rundungen aus dem Gestaltungsleitfaden.
+            borderRadius: { DEFAULT: '4px', md: '8px', lg: '12px', xl: '12px', '2xl': '12px' }
+          }
+        }
+      };
+    </script>
   </head>
   <body>
     <div id="root"></div>
