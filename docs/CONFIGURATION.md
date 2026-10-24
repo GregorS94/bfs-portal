@@ -17,8 +17,10 @@ Volume wie das Audit-Log. Treiber lesen bei jedem Zugriff frisch — eine
 
 | Variable | Vorgabe | Bedeutung |
 |----------|---------|-----------|
-| `ANTHROPIC_API_KEY` | — | **Pflicht.** Ohne ihn startet das Backend, aber jede Chat-Anfrage scheitert |
+| `BOT_API_TOKEN` | — | **Pflicht.** Token des Copilot-Studio-Agents; fehlt er, antwortet `/api/bot/*` mit 503 |
 | `AGENT_TOKEN` | — | **Pflicht.** Anmelde-Token für Agenten; danach hat jedes Gerät ein eigenes |
+| `CHAT_ENABLED` | `false` | Eigener Chat im Portal (Vorführweg ohne M365). Aus heißt: keine KI im Backend |
+| `ANTHROPIC_API_KEY` | — | Nur mit `CHAT_ENABLED=true` nötig. Der Client entsteht erst beim ersten Chat-Aufruf |
 | `AUDIT_RETENTION_DAYS` | `0` | Aufbewahrung des Audit-Logs in Tagen; 0 = unbegrenzt |
 | `PORT` | `3000` | Port im Container |
 | `DATA_DIR` | `/data` | Ablage für Audit-Log und Einstellungen |

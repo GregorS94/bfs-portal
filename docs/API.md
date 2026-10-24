@@ -9,7 +9,7 @@ fehlende Konfiguration eines Fremdsystems → `503`.
 | Methode | Pfad | Zweck |
 |---------|------|-------|
 | GET | `/health` | Lebenszeichen des Backends |
-| GET | `/api/config` | Entra-Werte für das Frontend zur Laufzeit |
+| GET | `/api/config` | Entra-Werte und `chatEnabled` für das Frontend zur Laufzeit |
 | GET | `/api/health/services` | Status aller Abhängigkeiten — siehe unten |
 | POST | `/api/auth/simple` | einfache Anmeldung, nur im Modus `simple` — sonst `404` |
 | POST | `/api/auth/local` | Konto und Passwort, nur im Modus `local` — sonst `404` |
@@ -33,7 +33,35 @@ Fehlversuchen je Kennung und Absenderadresse folgt `429` mit Wartezeit.
 Token** zurück: Eine Passwortänderung beendet alle Sitzungen des Kontos, und
 ohne das neue Token wäre der Ändernde selbst mit abgemeldet.
 
-## Chat
+## Bot-API (Copilot Studio)
+
+Der Weg, über den Mitarbeitende das Portal tatsächlich benutzen: Teams →
+Copilot Studio → diese vier Endpunkte. **Keine Benutzeranmeldung**, sondern
+`Authorization: Bearer <BOT_API_TOKEN>`. Ohne gesetztes Token antwortet jeder
+dieser Pfade mit `503`, mit falschem Token mit `401`.
+
+| Methode | Pfad | Zweck |
+|---------|------|-------|
+| POST | `/api/bot/diagnose` | feste Liste lesender Prüfungen, Befunde + Freigabevorschlag |
+| POST | `/api/bot/approve/:id` | Freigabe oder Ablehnung eines Auftrags |
+| GET | `/api/bot/status/:id` | Stand eines Auftrags oder eines Diagnoselaufs |
+| POST | `/api/bot/ticket` | Eskalation nach Jira, ein Vorgang je Gespräch |
+
+Jede Antwort enthält zusätzlich `card`: eine fertige Adaptive Card für Teams.
+Die Freigabeknöpfe tragen nur die Auftrags-Kennung, nie Befehlstext.
+
+Die Freigabe läuft über dieselbe Prüfung wie im Portal (`decisionProblem`), und
+der Bot gilt dabei als Rolle `user`: Aktionen mit Vier-Augen-Prinzip sind über
+Teams nicht freigebbar (`403`). Ein nicht mehr offener Auftrag ergibt `409`.
+
+Anfragen, Antworten und die Einrichtung in Copilot Studio:
+[COPILOT_STUDIO.md](COPILOT_STUDIO.md).
+
+## Chat im Portal (abgeschaltet)
+
+Die Gesprächslogik liegt in Copilot Studio. Diese beiden Pfade bleiben als
+Vorführweg ohne M365-Tenant im Code und antworten mit `503`, solange
+`CHAT_ENABLED` nicht `true` ist.
 
 | Methode | Pfad | Rolle | Zweck |
 |---------|------|-------|-------|

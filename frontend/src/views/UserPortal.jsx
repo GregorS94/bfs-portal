@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, ShieldAlert, Terminal, MessageSquare, Package, Loader2 } from 'lucide-react';
+import { Send, ShieldAlert, Terminal, MessageSquare, Package, Loader2, MessagesSquare } from 'lucide-react';
 import RichText from '../markdown';
-import { authedFetch } from '../auth';
+import { authedFetch, authConfig } from '../auth';
 import KioskPanel from './KioskPanel';
 
 // Mitarbeiter-Sicht: Chat und Kiosk. Keine Geräte, kein Audit.
@@ -9,8 +9,14 @@ import KioskPanel from './KioskPanel';
 // Der Reiter „Software" war bis zum 2026-10-18 eine Attrappe — er rief
 // `/api/baramundi/software` auf, eine Route, die es nie gab. Jetzt steht dort
 // der echte Weg: anfordern, die IT gibt frei, abholen im baramundi Kiosk.
+//
+// Seit der Umstellung auf Copilot Studio ist der Chat hier nicht mehr der Weg
+// für Mitarbeitende, sondern der Vorführweg ohne M365-Tenant. Das Backend sagt
+// über /api/config, ob er läuft; ist er aus, steht hier der Verweis auf Teams
+// statt eines Eingabefelds, das 503 antwortet.
 export default function UserPortal() {
-  const [activeTab, setActiveTab] = useState('chat');
+  const chatAn = authConfig().chatEnabled === true;
+  const [activeTab, setActiveTab] = useState(chatAn ? 'chat' : 'teams');
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
@@ -109,7 +115,9 @@ export default function UserPortal() {
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, pendingApprovals]);
 
   const TABS = [
-    { id: 'chat', label: 'Chat', icon: MessageSquare },
+    chatAn
+      ? { id: 'chat', label: 'Chat', icon: MessageSquare }
+      : { id: 'teams', label: 'Support in Teams', icon: MessagesSquare },
     { id: 'kiosk', label: 'Software', icon: Package }
   ];
 
@@ -218,6 +226,22 @@ export default function UserPortal() {
                 <Send size={20} />
               </button>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'teams' && (
+          <div className="h-full flex flex-col items-center justify-center text-center px-6">
+            <MessagesSquare size={26} className="text-akzent mb-4" strokeWidth={1.5} />
+            <h2 className="font-kopf text-xl font-bold text-tinte mb-1">Der Support sitzt in Microsoft Teams</h2>
+            <p className="text-sm text-leise mb-6 max-w-md">
+              Probleme, Anliegen und Anfragen laufen über den Chat <span className="font-semibold">BFS IT-Service</span>
+              {' '}in Teams — entweder über Copilot oder über <span className="font-mono">@BFS-Bot</span>. Dort sieht der
+              Support bei Bedarf selbst auf dem Gerät nach; Änderungen laufen erst nach einer Freigabe, die als Karte
+              im Chat erscheint.
+            </p>
+            <p className="text-sm text-leise max-w-md">
+              Dieses Portal brauchst du nur für den Reiter <span className="font-semibold">Software</span>.
+            </p>
           </div>
         )}
 

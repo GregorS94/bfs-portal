@@ -25,9 +25,28 @@ die anfragende Person den eigenen Auftrag nicht freigeben.
 Kette sichtbar — was der Sinn der Sache ist. Wer Einträge programmatisch
 entfernt, nutzt `pruneAudit()`, nicht die Datei direkt.
 
-**Neue Backend-Dateien in `backend/Dockerfile` eintragen.** Dort steht eine
-Liste einzelner `COPY`-Anweisungen. Wer das vergisst, bekommt
-`MODULE_NOT_FOUND` beim Start des Containers.
+**Neue Backend-Dateien braucht man nicht einzutragen.** `backend/Dockerfile`
+kopiert `*.js` als Ganzes — die Einzelaufzählung wurde entfernt, nachdem sie
+beim Hinzufügen von `simple-auth.js` vergessen worden war und das Backend mit
+`MODULE_NOT_FOUND` nicht mehr startete. Ein neues **Unterverzeichnis** braucht
+dagegen eine eigene `COPY`-Zeile.
+
+**Die Bot-API erweitert das Portal, sie umgeht es nicht.** Alles unter
+`/api/bot` prüft Freigaben über `decisionProblem()` aus `approval.js` — dieselbe
+Funktion wie die Portalroute — und der Bot gilt dabei als Rolle `user`. Wer dort
+eine Rolle hochzieht, hebelt das Vier-Augen-Prinzip über Teams aus.
+`BOT_API_TOKEN` weist einen Dienst aus, nie eine Person: die `userId` aus dem
+Rumpf ist eine Behauptung, deshalb darf `/api/bot/*` nicht öffentlich
+erreichbar sein.
+
+**Was der Bot messen lässt, steht in `bot.js`, nicht im Agenten.**
+`DIAGNOSE_STEPS` und `REMEDIES` sind feste Listen. Copilot Studio wählt keine
+Aktion aus; es stößt die Diagnose an. Eine Adaptive Card trägt nie Befehlstext,
+nur die Auftrags-Kennung.
+
+**Was nicht gemessen wurde, wird nicht behauptet.** Lässt sich eine Ausgabe
+nicht lesen, liefert `diagnose.js` `used: null` und `status: 'unknown'` — nie
+eine 0 und nie ein „ok".
 
 **Ausgaben schreibender Aktionen gehören nicht zurück ins Modell**, wenn sie
 Geheimnisse enthalten können. Dafür gibt es `chat: false`.

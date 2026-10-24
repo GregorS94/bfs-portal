@@ -38,9 +38,23 @@ node tools/agents-test.js         # 22 Prüfungen: Geräte-Token, Sperren
 node tools/simple-auth-test.js    # 24 Prüfungen: einfacher Anmeldeweg, Fälschung, Ablauf
 node tools/agent-allowlist-test.js #    Portal- und Agenten-Freigabeliste im Abgleich
 node tools/bconnect-test.js       # 37 Prüfungen: beide Fassungen, Job-Zustände
+node tools/accounts-test.js       # 52 Prüfungen: lokale Konten, scrypt, Sperren
+node tools/kiosk-test.js          # 22 Prüfungen: Anforderungen, Freigabe, Zustände
+node tools/diagnose-test.js       # 34 Prüfungen: Auswertung von df, free, PowerShell
+node tools/bot-test.js            # 69 Prüfungen: Bot-API über echtes HTTP
 ```
 
-Alle neun laufen ohne Server und ohne installierte Abhängigkeiten.
+13 Skripte, 329 Prüfungen. Alle laufen ohne Installation; `bot-test.js` startet
+dazu einen eigenen Server auf einem freien Port und spricht ihn per `fetch` an.
+Die Auftragsverwaltung ist dort nachgebaut, damit Token, Statuscodes,
+Freigaberegel und die Form der Adaptive Cards ohne Gerät prüfbar sind.
+
+`tools/db-test.js` braucht Postgres und läuft nur auf dem Pi:
+
+```bash
+docker compose cp tools backend:/tmp/tools
+docker compose exec backend node /tmp/tools/db-test.js
+```
 
 `agent-allowlist-test.js` verdient dabei besondere Beachtung: er vergleicht die
 Freigabeliste in `backend/actions.js` mit der im Agenten. Wird eine Aktion

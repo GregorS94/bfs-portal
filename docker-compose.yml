@@ -28,6 +28,9 @@ services:
       DB_HOST: ${DB_HOST:-db}
       DB_NAME: ${DB_NAME:-bfs_portal}
       DB_USER: ${DB_USER:-portal}
+      # Die KI liegt in Copilot Studio. Hier ausdrücklich aus, damit eine ältere
+      # .env den Chat im Portal nicht versehentlich anlässt.
+      CHAT_ENABLED: ${CHAT_ENABLED:-false}
     volumes:
       - audit_data:/data
     ports:

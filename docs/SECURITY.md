@@ -21,6 +21,20 @@ die Metazeichen interpretieren könnte.
 
 Im Test abgewiesen: `bash -c`, `curl`, `systemctl mask`, ein Argument mit `;`.
 
+**Beides gilt unverändert für den Weg über Teams.** Copilot Studio wählt keine
+Aktion aus: `/api/bot/diagnose` führt die feste Liste `DIAGNOSE_STEPS` aus, und
+Vorschläge kommen aus `REMEDIES` in `backend/bot.js`. Eine Adaptive Card trägt
+nur die Auftrags-Kennung, nie Befehlstext (geprüft in `tools/bot-test.js`).
+
+**Neu und schwächer ist dort die Identität.** `BOT_API_TOKEN` weist den Dienst
+aus, nicht die Person; die `userId` im Rumpf ist eine Behauptung des Agenten.
+Wer das Token hat, kann als jede beliebige Person auftreten. Daraus folgt
+zwingend: `/api/bot/*` ist nicht öffentlich erreichbar — Copilot Studio kommt
+über Azure Private Link oder VPN herein. Und der Bot gilt bei der Freigabe nur
+als Rolle `user`, damit Vier-Augen-Aktionen über Teams nicht freigebbar sind.
+Zielbild ist ein Entra-Token der Managed Identity, aus dem die `userId`
+stammt, statt sie zu glauben ([`COPILOT_STUDIO.md`](COPILOT_STUDIO.md)).
+
 ## Windows: der Skripttext ist die Freigabe, nicht das Programm
 
 Unter Windows gibt es keinen der freigegebenen Linux-Befehle; alles läuft über

@@ -1,9 +1,14 @@
 # BFS Self-Service Portal
 
-KI-gestützter 1st-Level-IT-Support: Mitarbeitende beschreiben ihr Problem im
-Chat, das Modell stellt Diagnosen über einen Agenten auf dem betroffenen Gerät,
-und ändernde Eingriffe laufen erst nach ausdrücklicher Freigabe in der
-Oberfläche — jeder Schritt im Audit-Log.
+KI-gestützter 1st-Level-IT-Support: Mitarbeitende beschreiben ihr Problem in
+**Microsoft Teams**, das Portal stellt Diagnosen über einen Agenten auf dem
+betroffenen Gerät, und ändernde Eingriffe laufen erst nach ausdrücklicher
+Freigabe — jeder Schritt im Audit-Log.
+
+Seit Oktober 2026 liegt die Gesprächslogik in **Microsoft Copilot Studio** im
+M365-Tenant. Dieses Backend ist dadurch eine REST-API **ohne Modell**, die
+Weboberfläche gehört der IT-Abteilung. Einrichtung und Schnittstelle:
+[`docs/COPILOT_STUDIO.md`](docs/COPILOT_STUDIO.md).
 
 > **Status: Prototyp, keine Produktivumgebung.** Läuft auf einem Raspberry Pi
 > als Prüfstand. Hochverfügbarkeit, Alarmierung und Backups sind bewusst kein
@@ -90,7 +95,8 @@ Testumgebung enthalten müsste, steht in
 Klassischer 1st-Level-Support besteht zu großen Teilen aus immer denselben
 Handgriffen: Platte voll, Dienst hängt, Protokolle laufen über.
 Das Portal lässt ein Sprachmodell diese Fälle aufnehmen, selbst nachsehen und
-— nach Freigabe — selbst beheben.
+— nach Freigabe — selbst beheben. Das Gespräch führt der Agent in Copilot
+Studio; *was* gemessen und *was* ausgeführt wird, entscheidet das Backend.
 
 Der Punkt ist nicht der Chat. Der Punkt ist, dass zwischen „das Modell schlägt
 etwas vor" und „auf dem Rechner passiert etwas" zwei unabhängige Kontrollen
@@ -99,28 +105,33 @@ liegen, die das Modell nicht umgehen kann. Siehe
 
 ## Aufbau in einem Absatz
 
-Ein React-Frontend (nginx) spricht mit einem Express-Backend, das den Chat per
-SSE streamt und Anthropic Tool Use gegen eine **feste Liste von 11 Aktionen**
+Ein Agent in Copilot Studio spricht über vier Endpunkte (`/api/bot/*`) mit
+einem Express-Backend, das Aufträge gegen eine **feste Liste von Aktionen**
 fährt. Lesende Aktionen laufen sofort, schreibende erzeugen einen Auftrag im
-Zustand `awaiting_approval`. Ein Python-Agent auf dem Zielgerät holt sich
-freigegebene Aufträge per Long-Polling ab und führt sie ohne Shell aus.
-Dazu kommen Treiber für Confluence/Jira, Microsoft Graph und baramundi
-bConnect. Details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+Zustand `awaiting_approval` und eine Freigabekarte in Teams. Ein Python-Agent
+auf dem Zielgerät holt sich freigegebene Aufträge per Long-Polling ab und führt
+sie ohne Shell aus. Daneben steht die IT-Oberfläche (React, nginx) für
+Vorgänge, Geräte, Audit-Log und Administration. Dazu Treiber für
+Confluence/Jira, Microsoft Graph und baramundi bConnect.
+Details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ```
-Browser ──► frontend (nginx :9000)
-              └─► backend (Express :9001) ──► Anthropic API
-                    ├─► Auftragswarteschlange ──► Agent auf dem Gerät
-                    ├─► Confluence / Jira
-                    ├─► Microsoft Graph
-                    └─► baramundi bConnect
+Teams ──► Copilot Studio (GPT-4o, M365-Tenant)
+            └─► backend (Express :9001, nur intern)
+                  ├─► Auftragswarteschlange ──► Agent auf dem Gerät
+                  ├─► Postgres (Konten, Kiosk)
+                  ├─► Confluence / Jira
+                  ├─► Microsoft Graph
+                  └─► baramundi bConnect
+
+Browser (IT) ──► frontend (nginx :9000) ──► dasselbe Backend
 ```
 
 ## Schnellstart
 
 ```bash
 git clone <repo> bfs-portal && cd bfs-portal
-cp .env.example .env          # ANTHROPIC_API_KEY und AGENT_TOKEN eintragen
+cp .env.example .env          # BOT_API_TOKEN, AGENT_TOKEN, DB_PASSWORD eintragen
 docker compose up -d --build
 ```
 
@@ -133,7 +144,7 @@ Geräte-Agent: [`docs/SETUP.md`](docs/SETUP.md).
 
 | Pfad | Bereich | Mindestrolle |
 |------|---------|--------------|
-| `/` | Mitarbeitende: Chat, eigene Freigaben, Software | `user` |
+| `/` | Mitarbeitende: Software anfordern (der Support läuft in Teams) | `user` |
 | `/it` | IT-Support: Aufträge, Geräte, Audit-Log, fremde Freigaben | `it` |
 | `/admin` | Administration: Dienste-Status, Zugangsdaten | `admin` |
 
@@ -164,6 +175,7 @@ ob etwas gesetzt ist.
 | [`docs/INSTALL_UBUNTU.md`](docs/INSTALL_UBUNTU.md) | Frische Ubuntu-Server-VM: feste IP, Docker, Firewall |
 | [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) | Alle Umgebungsvariablen und Oberflächen-Einstellungen |
 | [`docs/API.md`](docs/API.md) | Alle Endpunkte mit Rollen |
+| [`docs/COPILOT_STUDIO.md`](docs/COPILOT_STUDIO.md) | Teams und Copilot Studio: Topics, Actions, Adaptive Cards, Einrichtung |
 | [`docs/OPERATIONS.md`](docs/OPERATIONS.md) | Tests, Attrappen, Statusprüfung, bekannte Fallstricke |
 | [`docs/ENTRA_SETUP.md`](docs/ENTRA_SETUP.md) | App-Registrierung in Entra ID |
 | [`docs/PROZESSE.md`](docs/PROZESSE.md) | Prozesse und aufsichtsrechtliche Einordnung (DORA, MaRisk, DSGVO, AI Act) |
@@ -181,13 +193,16 @@ Nachbau der Request-Formen genügt, um Filterlogik und Injektionsabwehr zu
 prüfen.
 
 ```bash
-for t in actions atlassian entra settings approval audit agents; do
-  node tools/$t-test.js || break
+for t in accounts actions agent-allowlist agents approval atlassian audit \
+         bconnect bot diagnose kiosk settings simple-auth; do
+  DATA_DIR=$(mktemp -d) node tools/$t-test.js || break
 done
 ```
 
-102 Prüfungen, ohne Server und ohne installierte Abhängigkeiten. Was sie im
-Einzelnen abdecken, steht in [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
+13 Skripte, 329 Prüfungen, ohne laufende Installation. `bot-test.js` startet den
+Router auf einem freien Port und prüft die Bot-API über echtes HTTP. Was die
+Skripte im Einzelnen abdecken, steht in
+[`docs/OPERATIONS.md`](docs/OPERATIONS.md).
 
 ## Lizenz
 

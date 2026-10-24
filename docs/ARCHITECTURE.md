@@ -5,7 +5,7 @@
 | Dienst | Technik | Port | Aufgabe |
 |--------|---------|------|---------|
 | `frontend` | React (kein Router), nginx | 9000 → 80 | Oberfläche, Statik, `/api`-Proxy |
-| `backend` | Node/Express | 9001 → 3000 | Chat, Werkzeuge, Aufträge, Audit, Treiber |
+| `backend` | Node/Express | 9001 → 3000 | Bot-API, Aufträge, Freigaben, Audit, Treiber |
 | `mock-api` | Node | 9002 → 3002 | Attrappe für Fremdsysteme im Entwicklungsbetrieb |
 | `db` | Postgres 16 | kein Port nach außen | Konten und Kiosk-Anforderungen |
 | Agent | Python 3, nur Standardbibliothek | — | läuft auf dem Zielgerät, holt Aufträge ab |
@@ -51,7 +51,32 @@ Lesende Aktionen (`risk: 'read'`) laufen ohne Rückfrage. Alles Schreibende
 hält bei `awaiting_approval` an, bis ein Mensch im UI zustimmt. Ein `user`
 darf nur eigene Aufträge freigeben, `it` und `admin` auch fremde.
 
-## Der Chat-Durchlauf
+## Der Weg über Teams
+
+Seit 2026-10-24 führt das Gespräch ein Agent in Microsoft Copilot Studio; das
+Backend hat kein Modell mehr. Der Durchlauf eines Problems:
+
+1. Teams → Copilot Studio erkennt das Topic „IT-Problem melden".
+2. `POST /api/bot/diagnose` mit `userId` (aus dem angemeldeten Teams-Konto)
+   und optional `deviceId`. Das Backend legt für jede Prüfung aus
+   `DIAGNOSE_STEPS` einen lesenden Auftrag an und wartet parallel höchstens
+   12 s auf die Ergebnisse — Copilot Studio bricht nach 30 s ab.
+3. `backend/diagnose.js` übersetzt die Befehlsausgaben in Zahl, Status und
+   einen Satz. Was nicht lesbar ist, bleibt `unknown`.
+4. Schlägt eine Prüfung an, legt das Backend den passenden schreibenden
+   Auftrag als `awaiting_approval` an und schickt eine Freigabekarte mit.
+5. Klick auf der Karte → `POST /api/bot/approve/:id`. Dieselbe Prüfung wie im
+   Portal (`decisionProblem`), dann geht der Auftrag in die Warteschlange des
+   Geräte-Agenten. Die Antwort wartet **nicht** auf das Ergebnis.
+6. `GET /api/bot/status/:id` liefert Zustand, Rückgabewert und einen Satz.
+
+Die vier Endpunkte liegen in `backend/bot.js`, die Karten in `backend/cards.js`.
+Einrichtung und Grenzen: [`COPILOT_STUDIO.md`](COPILOT_STUDIO.md).
+
+## Der Chat-Durchlauf (abgeschaltet)
+
+Dieser Weg bleibt als Vorführung ohne M365-Tenant im Code und antwortet mit
+`503`, solange `CHAT_ENABLED` nicht `true` ist.
 
 `POST /api/support/chat` streamt per SSE. Pro Zug:
 

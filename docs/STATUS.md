@@ -1,6 +1,6 @@
 # Stand
 
-Letzte Aktualisierung: 2026-10-18. Fahrplan: [`FAHRPLAN.md`](FAHRPLAN.md).
+Letzte Aktualisierung: 2026-10-24. Fahrplan: [`FAHRPLAN.md`](FAHRPLAN.md).
 
 Prototyp und Entwicklungsumgebung, nichts Produktives. Hochverfügbarkeit,
 Alarmierung und Backups sind bewusst kein Ziel. Fernziel ist ein
@@ -11,10 +11,34 @@ Betrieben wird das Ganze auf einem Raspberry Pi 5, weil kein Windows-Rechner
 zum Testen zur Verfügung steht. Das prägt einiges: die Linux-Varianten der
 Aktionen sind erprobt, die PowerShell-Varianten sind es nicht.
 
+## Umstellung auf Copilot Studio (2026-10-24)
+
+Das Gespräch läuft künftig in Microsoft Teams über einen Agenten in Copilot
+Studio; das Backend ist eine REST-API ohne Modell. Umgesetzt und geprüft:
+
+* Vier Endpunkte `/api/bot/diagnose|approve|status|ticket`, eigenes
+  Dienst-Token (`BOT_API_TOKEN`), Adaptive Cards in jeder Antwort.
+* Die Freigabe läuft über dieselbe `decisionProblem()`-Prüfung wie das Portal;
+  der Bot gilt als Rolle `user`, Vier-Augen-Aktionen sind über Teams nicht
+  freigebbar.
+* Auswertung der Messausgaben (`backend/diagnose.js`): `df`, `free`,
+  `Get-PSDrive`, `Win32_OperatingSystem`. Nicht lesbare Ausgabe ergibt
+  `unknown` und keine Zahl.
+* `tools/bot-test.js` (69 Prüfungen, echtes HTTP) und
+  `tools/diagnose-test.js` (34 Prüfungen).
+* Der Chat im Portal ist abgeschaltet (`CHAT_ENABLED=false`) und bleibt als
+  Vorführweg ohne M365-Tenant im Code. Ohne ihn braucht das Backend keinen
+  `ANTHROPIC_API_KEY` mehr — der Client entsteht erst beim ersten Aufruf.
+
+**Nie gegen Microsoft gelaufen.** Es gibt keinen M365-Tenant im Prüfstand.
+Topics, HTTP Actions, Manifest und Teams-Ausrollung sind nach der
+Dokumentation beschrieben ([`COPILOT_STUDIO.md`](COPILOT_STUDIO.md)), nicht
+erprobt. Geprüft ist allein die Seite, die hier liegt: die REST-API.
+
 ## Fertig und verifiziert
 
 **Chat.** Echter Claude-Chat über SSE, Verlauf über 20 Züge, rund 0,9 ct pro
-Gespräch.
+Gespräch. Seit 2026-10-24 abgeschaltet, siehe oben.
 
 **Werkzeuge.** Tool Use gegen die feste Aktionsliste. Lesende Aktionen laufen
 sofort mit echten Gerätedaten.
@@ -136,6 +160,21 @@ Seitenkörper nachgeladen und aus dem XHTML Fließtext gemacht.
 9. **Der lokale Anmeldeweg prüft gegen das Portal, nicht gegen das AD.** Für
    den Echtbetrieb bleibt Entra der einzige zulässige Weg; `local` ist der
    bequeme Weg für Vorführung und Entwicklung ohne Mandanten.
+10. **Die Bot-API weist den Dienst aus, nicht die Person.** Wer
+    `BOT_API_TOKEN` hat, kann als jede `userId` auftreten. Deshalb darf
+    `/api/bot/*` nicht öffentlich erreichbar sein. Zielbild: Entra-Token der
+    Managed Identity prüfen und die `userId` aus dessen Ansprüchen nehmen.
+11. **Die Gerätezuordnung fehlt.** Ohne `deviceId` nimmt das Portal das Gerät,
+    das sich meldet — im Prototyp eindeutig, im Betrieb nicht. Person → Gerät
+    muss aus Entra oder baramundi kommen.
+12. **Ein übergebener Auftrag kommt nicht in die Warteschlange zurück.** Geht
+    die Antwort des Agenten verloren, bleibt der Auftrag auf `dispatched`
+    stehen (`dispatch()` in `backend/jobs.js`). Vorbestehend, fällt über Teams
+    aber eher auf, weil die Diagnose nach 12 s antworten muss.
+13. **Copilot Studio ist aufsichtsrechtlich nicht eingetragen.** Als IKT-
+    Drittdienstleister gehört es ins DORA-Auslagerungsregister, die
+    Datenschutz-Folgeabschätzung ist fortzuschreiben, der Betriebsrat bleibt
+    wegen des Audit-Logs zu beteiligen ([`PROZESSE.md`](PROZESSE.md)).
 
 ## Vor einem Produktivbetrieb
 
